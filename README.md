@@ -1,1 +1,26 @@
-# DeepSeek Harness Desktop\n\nAn Electron desktop shell for the DeepSeek Harness Web UI.\n\n## What it does\n\n- Starts the installed dsh web server inside an Electron window.\n- Loads the real Harness UI so the web and desktop experiences share the same runtime.\n- Provides an updater for the installed @deepseek-ai/dsh package.\n- Includes smoke-test support for validating the desktop boot path.\n\n## Files\n\n- main.js — Electron main process and desktop window lifecycle.\n- preload.cjs — isolated preload bridge.\n- _extracted/ — extracted application source snapshot.\n\n## Running locally\n\nThis project expects Electron and a working Node.js installation. The desktop shell resolves the installed DSH CLI automatically, or can use the managed DSH installation configured by the app.\n\nPackaged installers are intentionally excluded from this source repository; build artifacts should be published separately through Releases.\n\n## License\n\nMIT\n
+# DeepSeek Harness Desktop
+
+An Electron desktop shell for the DeepSeek Harness Web UI.
+
+## What it does
+
+- Starts the installed dsh web server inside an Electron window.
+- Loads the real Harness UI so the web and desktop experiences share the same runtime.
+- Provides an updater for the installed @deepseek-ai/dsh package.
+- Includes smoke-test support for validating the desktop boot path.
+
+## Files
+
+- main.js — Electron main process and desktop window lifecycle.
+- preload.cjs — isolated preload bridge.
+- _extracted/ — extracted application source snapshot.
+
+## Running locally
+
+This project expects Electron and a working Node.js installation. The desktop shell resolves the installed DSH CLI automatically, or can use the managed DSH installation configured by the app.
+
+Packaged installers are intentionally excluded from this source repository; build artifacts should be published separately through Releases.
+
+## License
+
+MIT
