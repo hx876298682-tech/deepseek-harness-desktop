@@ -19,7 +19,7 @@ An Electron desktop shell for the DeepSeek Harness Web UI.
 
 This project expects Electron and a working Node.js installation. The desktop shell resolves the installed DSH CLI automatically, or can use the managed DSH installation configured by the app.
 
-Packaged installers are intentionally excluded from this source repository; build artifacts should be published separately through Releases.
+Packaged installers are intentionally excluded from this source repository; build artifacts are published separately through GitHub Releases. The Settings → Updates page checks both the npm CLI channel and this desktop Release channel. Desktop installers are downloaded and opened for manual installation; the running application is never overwritten in place.
 
 ## License
 

@@ -5,13 +5,21 @@ import { app, BrowserWindow, Menu, dialog, shell, ipcMain } from "electron";
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { appendFileSync, existsSync } from "node:fs";
+import { appendFileSync, createWriteStream, existsSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import { resolveDsh } from "./resolve-dsh.js";
+import { compareVersions, parseVersion, pickDesktopAsset } from "./update-utils.js";
 
 const SMOKE_TEST = process.argv.includes("--smoke-test");
 const SMOKE_TIMEOUT_MS = 120000;
 const UPDATE_PACKAGE = "@deepseek-ai/dsh";
+const DESKTOP_REPOSITORY = "hx876298682-tech/deepseek-harness-desktop";
+const DESKTOP_RELEASES_API = "https://api.github.com/repos/" + DESKTOP_REPOSITORY + "/releases/latest";
+const DESKTOP_RELEASES_LIST_API = "https://api.github.com/repos/" + DESKTOP_REPOSITORY + "/releases?per_page=5";
+const DESKTOP_RELEASE_CACHE_TTL_MS = 10 * 60 * 1000;
 
 let win = null;
 let child = null;
@@ -21,6 +29,8 @@ let dshInfo = null;
 let quitting = false;
 let logPath = null;
 let updateInFlight = false;
+let desktopUpdateInFlight = false;
+let desktopReleaseCache = null;
 
 function log(msg) {
   const line = "[" + new Date().toISOString() + "] " + msg;
@@ -178,21 +188,6 @@ function runCommand(command, args, timeoutMs = 120000) {
   });
 }
 
-function parseVersion(value) {
-  const match = String(value || "").trim().match(/v?(\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?)/);
-  return match ? match[1] : null;
-}
-
-function compareVersions(a, b) {
-  const split = (value) => { const parts = value.replace(/^v/, "").split("-"); return { base: parts[0].split(".").map((part) => Number.parseInt(part, 10) || 0), pre: parts[1] ? parts[1].split(".") : [] }; };
-  const left = split(a), right = split(b);
-  for (let i = 0; i < 3; i++) if ((left.base[i] || 0) !== (right.base[i] || 0)) return (left.base[i] || 0) > (right.base[i] || 0) ? 1 : -1;
-  if (!left.pre.length && !right.pre.length) return 0;
-  if (!left.pre.length) return 1;
-  if (!right.pre.length) return -1;
-  return left.pre.join(".") === right.pre.join(".") ? 0 : (left.pre.join(".") > right.pre.join(".") ? 1 : -1);
-}
-
 async function checkDshUpdate() {
   const current = resolveDsh();
   if (!current.ok || !current.version) throw new Error(current.error || "无法找到本机 dsh CLI");
@@ -201,6 +196,99 @@ async function checkDshUpdate() {
   try { latest = parseVersion(JSON.parse(result.stdout)); } catch { latest = parseVersion(result.stdout); }
   if (!latest) throw new Error("npm 返回的 dsh 版本号无效");
   return { currentVersion: parseVersion(current.version) || current.version, latestVersion: latest, hasUpdate: compareVersions(latest, current.version) > 0, via: current.via };
+}
+
+async function fetchGitHubJson(url) {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      "User-Agent": "deepseek-harness-desktop"
+    }
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    const error = new Error("GitHub 请求失败 (" + response.status + "): " + text.slice(0, 240));
+    error.status = response.status;
+    throw error;
+  }
+  try { return JSON.parse(text); } catch { throw new Error("GitHub 返回了无效的 JSON"); }
+}
+
+async function checkDesktopUpdate() {
+  const currentVersion = parseVersion(app.getVersion()) || app.getVersion();
+  const releasesUrl = "https://github.com/" + DESKTOP_REPOSITORY + "/releases";
+  if (desktopReleaseCache && desktopReleaseCache.expiresAt > Date.now()) return desktopReleaseCache.result;
+  let release;
+  try {
+    release = await fetchGitHubJson(DESKTOP_RELEASES_API);
+  } catch (error) {
+    if (error.status !== 404) throw error;
+    const releases = await fetchGitHubJson(DESKTOP_RELEASES_LIST_API);
+    release = Array.isArray(releases) ? releases.find((item) => !item?.draft && !item?.prerelease) : null;
+  }
+  if (!release) {
+    const result = { currentVersion, latestVersion: null, hasUpdate: false, available: false, releaseUrl: releasesUrl, message: "还没有发布桌面应用版本" };
+    desktopReleaseCache = { expiresAt: Date.now() + DESKTOP_RELEASE_CACHE_TTL_MS, release: null, result };
+    return result;
+  }
+  const latestVersion = parseVersion(release.tag_name || release.name);
+  if (!latestVersion) throw new Error("GitHub Release 没有有效的版本号");
+  const asset = pickDesktopAsset(release.assets, { platform: process.platform, arch: process.arch });
+  const result = {
+    currentVersion,
+    latestVersion,
+    hasUpdate: compareVersions(latestVersion, currentVersion) > 0,
+    available: Boolean(asset),
+    assetName: asset?.name || null,
+    releaseUrl: release.html_url || releasesUrl,
+    runningFromMountedImage: process.execPath.includes("/Volumes/"),
+    message: asset ? "发现适用于当前平台的安装包" : "有新版本，但没有适用于当前平台的安装包"
+  };
+  desktopReleaseCache = { expiresAt: Date.now() + DESKTOP_RELEASE_CACHE_TTL_MS, release, result };
+  return result;
+}
+
+async function installDesktopUpdate() {
+  if (desktopUpdateInFlight) throw new Error("桌面应用更新正在进行中");
+  desktopUpdateInFlight = true;
+  try {
+    const update = await checkDesktopUpdate();
+    if (!update.hasUpdate) throw new Error(update.latestVersion ? "当前桌面应用已经是最新版本" : "没有可用的桌面应用更新");
+    if (!update.available) throw new Error(update.message || "没有适用于当前平台的安装包");
+    if (update.runningFromMountedImage) throw new Error("当前应用正在从 DMG 挂载盘运行，请先将它拖入 Applications 文件夹");
+    const release = desktopReleaseCache?.release;
+    const asset = pickDesktopAsset(release?.assets, { platform: process.platform, arch: process.arch });
+    if (!asset?.browser_download_url) throw new Error("桌面应用安装包下载地址不可用");
+    const response = await fetch(asset.browser_download_url, {
+      headers: { Accept: "application/octet-stream", "User-Agent": "deepseek-harness-desktop" }
+    });
+    if (!response.ok || !response.body) throw new Error("下载安装包失败 (" + response.status + ")");
+    const updateDir = join(app.getPath("temp"), "deepseek-harness-desktop-updates");
+    await mkdir(updateDir, { recursive: true });
+    const filename = update.latestVersion + "-" + String(asset.name).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const assetPath = join(updateDir, filename);
+    const total = Number(asset.size || response.headers.get("content-length") || 0);
+    let received = 0;
+    const nodeStream = Readable.fromWeb(response.body);
+    nodeStream.on("data", (chunk) => {
+      received += chunk.length;
+      win?.webContents.send("dsh-desktop-update:progress", { received, total, percent: total ? received / total : null });
+    });
+    await pipeline(nodeStream, createWriteStream(assetPath));
+    if (asset.size && received !== asset.size) throw new Error("下载安装包不完整");
+    const openError = await shell.openPath(assetPath);
+    if (openError) throw new Error("安装包已下载，但无法打开：" + openError);
+    return {
+      version: update.latestVersion,
+      assetName: asset.name,
+      assetPath,
+      releaseUrl: update.releaseUrl,
+      requiresManualInstall: true,
+      message: process.platform === "darwin" ? "安装包已打开，请将应用拖入 Applications 文件夹后完全退出并重新启动；未签名应用可能需要右键打开" : "安装包已打开，请完成安装后完全退出并重新启动应用"
+    };
+  } finally {
+    desktopUpdateInFlight = false;
+  }
 }
 
 async function installDshUpdate() {
@@ -216,6 +304,13 @@ async function installDshUpdate() {
 }
 
 ipcMain.handle("dsh-update:check", async () => checkDshUpdate());
+ipcMain.handle("dsh-desktop-update:check", async () => checkDesktopUpdate());
+ipcMain.handle("dsh-desktop-update:install", async () => installDesktopUpdate());
+ipcMain.handle("dsh-desktop-update:open", async (_event, value) => {
+  const url = new URL(String(value || ""));
+  if (url.protocol !== "https:" || url.hostname !== "github.com" || !url.pathname.startsWith("/" + DESKTOP_REPOSITORY)) throw new Error("只允许打开本项目的 GitHub Releases 页面");
+  return shell.openExternal(url.toString());
+});
 ipcMain.handle("dsh-update:install", async () => {
   if (updateInFlight) throw new Error("更新正在进行中");
   updateInFlight = true;

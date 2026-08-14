@@ -1,143 +1,19 @@
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webFrame } = require("electron");
 
-contextBridge.exposeInMainWorld("__DSH_DESKTOP_UPDATER__", {
+const updater = {
   check: () => ipcRenderer.invoke("dsh-update:check"),
-  install: () => ipcRenderer.invoke("dsh-update:install")
-});
+  install: () => ipcRenderer.invoke("dsh-update:install"),
+  checkDesktop: () => ipcRenderer.invoke("dsh-desktop-update:check"),
+  installDesktop: () => ipcRenderer.invoke("dsh-desktop-update:install"),
+  openExternal: (url) => ipcRenderer.invoke("dsh-desktop-update:open", url),
+  onDesktopProgress: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("dsh-desktop-update:progress", listener);
+    return () => ipcRenderer.removeListener("dsh-desktop-update:progress", listener);
+  }
+};
 
-(() => {
-  const updater = {
-    check: () => ipcRenderer.invoke("dsh-update:check"),
-    install: () => ipcRenderer.invoke("dsh-update:install")
-  };
-  const NAV_MARK = "data-dsh-update-nav";
-  const PAGE_MARK = "data-dsh-update-page";
-  let activePanel = null;
+contextBridge.exposeInMainWorld("__DSH_DESKTOP_UPDATER__", updater);
 
-  const style = document.createElement("style");
-  style.textContent = [
-    "[data-dsh-update-page]{box-sizing:border-box;padding:8px 4px 24px;color:var(--dsw-alias-label-primary);font-family:inherit}",
-    "[data-dsh-update-page] *{box-sizing:border-box}",
-    "[data-dsh-update-page] h2{margin:0 0 8px;font-size:20px;font-weight:500;line-height:28px}",
-    "[data-dsh-update-page] p{margin:0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:20px}",
-    "[data-dsh-update-page] .dsh-update-card{margin-top:24px;padding:18px 20px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-primary);border-radius:16px}",
-    "[data-dsh-update-page] .dsh-update-row{display:flex;align-items:center;justify-content:space-between;gap:16px}",
-    "[data-dsh-update-page] .dsh-update-title{font-size:14px;font-weight:500}",
-    "[data-dsh-update-page] .dsh-update-version{margin-top:4px;font-size:12px;color:var(--dsw-alias-label-secondary)}",
-    "[data-dsh-update-page] button{border:0;border-radius:10px;padding:8px 14px;background:var(--dsw-alias-interactive-bg-brand);color:var(--dsw-alias-label-on-brand);font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}",
-    "[data-dsh-update-page] button:disabled{opacity:.5;cursor:default}",
-    "[data-dsh-update-page] .dsh-update-status{margin-top:14px;min-height:20px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:20px}",
-    "[data-dsh-update-page] .dsh-update-status[data-error=true]{color:var(--dsw-alias-state-error-primary)}",
-    "[data-dsh-update-page] .dsh-update-status[data-success=true]{color:var(--dsw-alias-state-success-primary)}",
-    "[data-dsh-update-nav]{box-sizing:border-box;cursor:pointer;height:40px;color:var(--dsw-alias-label-primary);text-align:left;background:transparent;border:0;border-radius:12px;align-items:center;gap:8px;padding:9px 16px 9px 12px;font-family:inherit;font-size:14px;font-weight:400;line-height:22px;display:flex;width:100%}",
-    "[data-dsh-update-nav]:hover,[data-dsh-update-nav].active{background:var(--dsw-specific-sidebar-nav-item-active)}",
-  ].join("");
-  document.documentElement.appendChild(style);
-
-  function getDialog() { return document.querySelector("[role=dialog]"); }
-  function getOptions(dialog) { return dialog && dialog.querySelector("[class*=options]"); }
-  function getNavList(dialog) { return dialog && dialog.querySelector("nav [class*=navList]"); }
-  function setStatus(page, message, kind) {
-    const status = page.querySelector(".dsh-update-status");
-    status.textContent = message;
-    status.dataset.error = kind === "error" ? "true" : "false";
-    status.dataset.success = kind === "success" ? "true" : "false";
-  }
-  function showNormalSection(dialog) {
-    const page = dialog && dialog.querySelector("[data-dsh-update-page]");
-    const options = getOptions(dialog);
-    if (page) page.remove();
-    if (options) options.style.display = "";
-    activePanel = null;
-  }
-  function makeText(tag, className, text) {
-    const element = document.createElement(tag);
-    if (className) element.className = className;
-    element.textContent = text;
-    return element;
-  }
-  function showUpdateSection(dialog) {
-    if (!dialog) return;
-    const options = getOptions(dialog);
-    if (!options || (activePanel && activePanel.isConnected)) return;
-    options.style.display = "none";
-    const page = document.createElement("section");
-    page.setAttribute(PAGE_MARK, "true");
-    page.append(makeText("h2", "", "更新"));
-    page.append(makeText("p", "", "检查并安装最新的 DeepSeek Harness CLI。更新完成后应用会自动重启。"));
-    const card = document.createElement("div");
-    card.className = "dsh-update-card";
-    const row = document.createElement("div");
-    row.className = "dsh-update-row";
-    const info = document.createElement("div");
-    info.append(makeText("div", "dsh-update-title", "DeepSeek Harness CLI"));
-    info.append(makeText("div", "dsh-update-version", "点击按钮检查 npm 上的最新版本"));
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = "检查更新";
-    const status = makeText("div", "dsh-update-status", "");
-    status.setAttribute("role", "status");
-    status.setAttribute("aria-live", "polite");
-    row.append(info, button);
-    card.append(row, status);
-    page.append(card);
-    options.parentElement.append(page);
-    activePanel = page;
-    button.addEventListener("click", async () => {
-      button.disabled = true;
-      setStatus(page, "正在检查最新版本…");
-      try {
-        const result = await updater.check();
-        page.querySelector(".dsh-update-version").textContent = "当前版本 v" + result.currentVersion + " · 最新版本 v" + result.latestVersion;
-        if (!result.hasUpdate) {
-          setStatus(page, "当前已是最新版本。", "success");
-          button.textContent = "已是最新";
-          return;
-        }
-        setStatus(page, "发现新版本 v" + result.latestVersion + "，正在下载安装…");
-        button.textContent = "正在更新…";
-        const installed = await updater.install();
-        setStatus(page, "已安装 v" + installed.version + "，应用即将重启…", "success");
-      } catch (error) {
-        setStatus(page, "更新失败：" + (error && error.message ? error.message : String(error)), "error");
-        button.disabled = false;
-        button.textContent = "重试";
-      }
-    });
-  }
-  function addUpdateNav() {
-    const dialog = getDialog();
-    const navList = getNavList(dialog);
-    if (!dialog || !navList || navList.querySelector("[" + NAV_MARK + "]")) return;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.setAttribute(NAV_MARK, "true");
-    const original = navList.querySelector("button");
-    if (original) button.className = original.className;
-    button.append(makeText("span", "", "↻"), makeText("span", "", "更新"));
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      navList.querySelectorAll("button").forEach((item) => {
-        for (const name of [...item.classList]) if (name === "active" || name.toLowerCase().includes("active")) item.classList.remove(name);
-      });
-      button.classList.add("active");
-      showUpdateSection(dialog);
-    });
-    navList.append(button);
-  }
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    const other = target.closest("[role=dialog] nav button:not([data-dsh-update-nav])");
-    if (other) showNormalSection(other.closest("[role=dialog]"));
-  }, true);
-  const observer = new MutationObserver(() => {
-    const dialog = getDialog();
-    if (dialog) addUpdateNav();
-    else activePanel = null;
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", addUpdateNav);
-  else addUpdateNav();
-})();
+const MAIN_WORLD = "(() => {\n  if (window.__DSH_DESKTOP_UPDATER_SECTION__) return;\n  window.__DSH_DESKTOP_UPDATER_SECTION__ = true;\n  const PLUGIN_ID = \"dsh-desktop-updater\";\n\n  function ensureEntry(graph) {\n    if (!graph || !Array.isArray(graph.entries)) return graph;\n    const entry = graph.entries.find((row) => row && row.id === PLUGIN_ID);\n    if (entry) { entry.rev = \"desktop-2\"; return graph; }\n    graph.entries.push({ id: PLUGIN_ID, url: \"about:blank\", rev: \"desktop-2\", immediately: true, inject: [\"@deepseek-ai/dsh-client-ui-settings-general\"] });\n    return graph;\n  }\n\n  function hookBoot() {\n    const current = window.__DSH_BOOT__;\n    if (current) ensureEntry(current);\n    try {\n      let value = current;\n      Object.defineProperty(window, \"__DSH_BOOT__\", { configurable: true, enumerable: true, get() { return value; }, set(next) { value = ensureEntry(next); } });\n    } catch { if (current) ensureEntry(current); }\n  }\n\n  function factory(require) {\n    const React = require(\"react\");\n    const jsxRuntime = require(\"react/jsx-runtime\");\n    const primitives = require(\"@deepseek-ai/dsh-client-ui-primitives\");\n    const jsx = jsxRuntime.jsx;\n    const jsxs = jsxRuntime.jsxs;\n    const Button = primitives.Button;\n    const css = [\n      \".dshDeskUpd_section{max-width:720px;color:var(--dsw-alias-label-primary);flex-direction:column;gap:12px;display:flex}\",\n      \".dshDeskUpd_title{color:var(--dsw-alias-label-primary);margin:0;font-size:16px;font-weight:500;line-height:24px}\",\n      \".dshDeskUpd_intro{color:var(--dsw-alias-label-tertiary);margin:0;font-size:14px;line-height:22px}\",\n      \".dshDeskUpd_card{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;flex-direction:column;gap:12px;padding:12px 14px;display:flex}\",\n      \".dshDeskUpd_row{align-items:center;gap:10px;display:flex}\",\n      \".dshDeskUpd_copy{min-width:0;flex:1}\",\n      \".dshDeskUpd_name{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:22px}\",\n      \".dshDeskUpd_meta{color:var(--dsw-alias-label-tertiary);margin:4px 0 0;font-size:12px;line-height:18px}\",\n      \".dshDeskUpd_actions{align-items:center;gap:4px;margin-left:auto;display:inline-flex}\",\n      \".dshDeskUpd_ok{color:var(--dsw-alias-state-success-primary);margin:0;font-size:12px;line-height:18px}\",\n      \".dshDeskUpd_error{color:var(--dsw-alias-state-error-primary);margin:0;font-size:12px;line-height:18px}\"\n    ].join(\"\");\n\n    function injectCss() {\n      if (typeof document === \"undefined\" || document.querySelector(\"style[data-plugin-css=dsh-desktop-updater]\")) return;\n      const tag = document.createElement(\"style\");\n      tag.dataset.plugin = PLUGIN_ID; tag.dataset.pluginCss = \"dsh-desktop-updater\"; tag.textContent = css; document.head.appendChild(tag);\n    }\n\n    function UpdateCard({ updater, desktop, title, idleMessage }) {\n      const [phase, setPhase] = React.useState(\"idle\");\n      const [current, setCurrent] = React.useState(\"\");\n      const [latest, setLatest] = React.useState(\"\");\n      const [status, setStatus] = React.useState(\"\");\n      const [kind, setKind] = React.useState(\"\");\n      const [releaseUrl, setReleaseUrl] = React.useState(\"\");\n      const [progress, setProgress] = React.useState(null);\n      React.useEffect(() => {\n        if (!desktop || !updater || typeof updater.onDesktopProgress !== \"function\") return undefined;\n        return updater.onDesktopProgress((payload) => setProgress(payload));\n      }, [desktop, updater]);\n      const show = (message, nextKind = \"\") => { setStatus(message); setKind(nextKind); };\n      const check = async () => {\n        if (!updater || phase === \"checking\" || phase === \"downloading\") return;\n        setPhase(\"checking\"); setProgress(null); show(\"正在检查最新版本…\");\n        try {\n          const result = await (desktop ? updater.checkDesktop() : updater.check());\n          setCurrent(result.currentVersion || \"\"); setLatest(result.latestVersion || \"\"); setReleaseUrl(result.releaseUrl || \"\");\n          if (!result.latestVersion) { setPhase(\"idle\"); show(result.message || \"还没有发布桌面应用版本\", desktop ? \"\" : \"ok\"); return; }\n          if (!result.hasUpdate) { setPhase(\"current\"); show(\"当前已是最新版本。\", \"ok\"); return; }\n          if (desktop && result.runningFromMountedImage) { setPhase(\"blocked\"); show(\"当前应用从 DMG 挂载盘运行，请先拖入 Applications 文件夹。\", \"err\"); return; }\n          if (desktop && !result.available) { setPhase(\"no-asset\"); show(result.message || \"有新版本，但没有当前平台安装包。\", \"err\"); return; }\n          if (desktop) { setPhase(\"ready\"); show(\"发现 v\" + result.latestVersion + \"，点击“下载安装包”继续。\", \"ok\"); return; }\n          setPhase(\"downloading\"); show(\"发现新版本，正在下载安装…\");\n          const installed = await updater.install(); setPhase(\"installed\"); show(\"已安装 v\" + installed.version + \"，应用即将重启…\", \"ok\");\n        } catch (error) { setPhase(\"error\"); show(\"更新失败：\" + (error?.message || String(error)), \"err\"); }\n      };\n      const install = async () => {\n        if (!desktop || phase !== \"ready\") return;\n        setPhase(\"downloading\"); setProgress(null); show(\"正在下载安装包…\");\n        try { const installed = await updater.installDesktop(); setPhase(\"installed\"); show(installed.message || \"安装包已打开，请完成安装后重启应用。\", \"ok\"); }\n        catch (error) { setPhase(\"error\"); show(\"更新失败：\" + (error?.message || String(error)), \"err\"); }\n      };\n      const label = phase === \"checking\" ? \"检查中…\" : phase === \"downloading\" ? \"下载中…\" : phase === \"ready\" ? \"下载安装包\" : phase === \"current\" ? \"重新检查\" : phase === \"installed\" ? \"重新检查\" : phase === \"error\" ? \"重试\" : \"检查更新\";\n      const busy = phase === \"checking\" || phase === \"downloading\";\n      const progressText = progress?.total && progress.percent !== null ? \" \" + Math.round(progress.percent * 100) + \"%\" : \"\";\n      const statusClass = kind === \"err\" ? \"dshDeskUpd_error\" : kind === \"ok\" ? \"dshDeskUpd_ok\" : \"dshDeskUpd_meta\";\n      const openRelease = () => { if (releaseUrl && updater.openExternal) updater.openExternal(releaseUrl).catch(() => {}); };\n      return jsxs(\"div\", { className: \"dshDeskUpd_card\", children: [\n        jsxs(\"div\", { className: \"dshDeskUpd_row\", children: [\n          jsxs(\"div\", { className: \"dshDeskUpd_copy\", children: [jsx(\"div\", { className: \"dshDeskUpd_name\", children: title }), jsx(\"p\", { className: \"dshDeskUpd_meta\", children: current ? (latest ? \"当前版本 v\" + current + \" · 最新版本 v\" + latest : \"当前版本 v\" + current) : idleMessage })] }),\n          jsxs(\"div\", { className: \"dshDeskUpd_actions\", children: [jsx(Button, { variant: \"primary\", size: \"sm\", disabled: busy || !updater, onClick: phase === \"ready\" ? install : check, children: label + (phase === \"downloading\" ? progressText : \"\") }), desktop && releaseUrl && (phase === \"no-asset\" || phase === \"blocked\" || !latest) ? jsx(Button, { variant: \"secondary\", size: \"sm\", onClick: openRelease, children: \"打开发布页\" }) : null] })\n        ] }),\n        status ? jsx(\"p\", { className: statusClass, children: status }) : null\n      ] });\n    }\n\n    function UpdateSection() {\n      const updater = window.__DSH_DESKTOP_UPDATER__;\n      return jsxs(\"div\", { className: \"dshDeskUpd_section\", children: [\n        jsx(\"h2\", { className: \"dshDeskUpd_title\", children: \"更新\" }),\n        jsx(\"p\", { className: \"dshDeskUpd_intro\", children: \"分别检查 CLI 与桌面应用。桌面安装包需要手动安装，不会自动替换正在运行的应用。\" }),\n        jsx(UpdateCard, { updater, desktop: false, title: \"DeepSeek Harness CLI\", idleMessage: \"从 npm 检查 CLI 最新版本\" }),\n        jsx(UpdateCard, { updater, desktop: true, title: \"DeepSeek Harness Desktop\", idleMessage: \"从 GitHub Releases 检查当前平台安装包\" })\n      ] });\n    }\n\n    const dictionaries = { zh: { nav: \"更新\" }, en: { nav: \"Updates\" } };\n    function apply(ctx) {\n      injectCss();\n      if (ctx.locale && typeof ctx.locale.register === \"function\") ctx.effect(() => ctx.locale.register(\"settings.desktopUpdate\", dictionaries), \"dsh-desktop-updater: locale\");\n      const t = ctx.locale && typeof ctx.locale.bind === \"function\" ? ctx.locale.bind(\"settings.desktopUpdate\") : () => \"更新\";\n      ctx.slots.inject(\"settings.section\", () => ctx.slots.register({ name: \"settings.section\", id: \"update\", order: 30, label: () => { try { return t(\"nav\"); } catch { return \"更新\"; } } }, UpdateSection));\n    }\n    return { apply, inject: [\"slots\", \"locale\"] };\n  }\n\n  function registerFactory(loader) { if (loader && typeof loader.load === \"function\") { try { loader.load({ id: PLUGIN_ID, factory }); } catch {} } }\n  function hookLoader() {\n    const current = window.__ModuleLoader__; if (current) registerFactory(current);\n    try { let value = current; Object.defineProperty(window, \"__ModuleLoader__\", { configurable: true, enumerable: true, get() { return value; }, set(next) { value = next; registerFactory(next); } }); } catch { if (current) registerFactory(current); }\n  }\n  hookBoot(); hookLoader();\n})();\n";
+webFrame.executeJavaScript(MAIN_WORLD).catch(() => {});

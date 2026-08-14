@@ -10,3 +10,5 @@
 # Local DSH/Electron state
 .dsh/
 node_modules/
+dist/
+release/
