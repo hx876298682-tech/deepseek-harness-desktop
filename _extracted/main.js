@@ -308,7 +308,8 @@ ipcMain.handle("dsh-desktop-update:check", async () => checkDesktopUpdate());
 ipcMain.handle("dsh-desktop-update:install", async () => installDesktopUpdate());
 ipcMain.handle("dsh-desktop-update:open", async (_event, value) => {
   const url = new URL(String(value || ""));
-  if (url.protocol !== "https:" || url.hostname !== "github.com" || !url.pathname.startsWith("/" + DESKTOP_REPOSITORY)) throw new Error("只允许打开本项目的 GitHub Releases 页面");
+  const allowedPath = "/" + DESKTOP_REPOSITORY;
+  if (url.protocol !== "https:" || url.hostname !== "github.com" || (url.pathname !== allowedPath && !url.pathname.startsWith(allowedPath + "/"))) throw new Error("只允许打开本项目的 GitHub Releases 页面");
   return shell.openExternal(url.toString());
 });
 ipcMain.handle("dsh-update:install", async () => {
