@@ -1,0 +1,9 @@
+{
+  "name": "dsh-desktop",
+  "productName": "DeepSeek Harness Desktop",
+  "version": "0.1.0",
+  "description": "Native window for the DeepSeek Harness Web UI. Launches the real `dsh web` server inside an Electron shell, so every harness feature works exactly as in the browser and dsh updates are picked up automatically.",
+  "main": "main.js",
+  "type": "module",
+  "license": "MIT"
+}

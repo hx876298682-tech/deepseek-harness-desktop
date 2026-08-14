@@ -1,0 +1,12 @@
+# macOS and desktop runtime files
+.DS_Store
+*.log
+
+# Packaged installers are kept out of the source repository.
+# The current arm64 DMG is larger than GitHub's regular file limit.
+*.dmg
+*.app/
+
+# Local DSH/Electron state
+.dsh/
+node_modules/
