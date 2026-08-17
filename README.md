@@ -2,6 +2,8 @@
 
 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 变成一个更方便使用的桌面应用。
 
+当前版本：`v0.1.3`
+
 支持 macOS、Windows 和 Linux。
 
 ## 实际界面
@@ -24,6 +26,12 @@
 - 支持发送图片
   - DeepSeek 模型保持官方的纯文本限制
   - 其他模型默认尝试发送图片，如果模型不支持，会显示服务商返回的错误
+- 支持发送文本和代码文件
+  - 点击输入框左下角的回形针按钮选择文件
+  - 也可以把文件直接拖到输入框
+  - 支持 TXT、Markdown、JSON、CSV 和常见代码文件
+  - 单个文件最大 1 MB，一次最多 5 个文件
+  - PDF、Word、Excel 等文件暂时不支持
 - 支持 macOS、Windows 和 Linux
 
 ## 安装使用
@@ -102,6 +110,14 @@ npm run dist:win
 ```text
 dsh-desktop.log
 ```
+
+### 如何发送文件？
+
+点击输入框左下角的回形针按钮，选择文本或代码文件。也可以直接把文件拖到输入框里。
+
+目前支持 TXT、Markdown、JSON、CSV 和常见代码文件。文件内容会以文字的形式放进消息，并带上文件名。
+
+单个文件不能超过 1 MB，一次最多选择 5 个文件。PDF、Word、Excel 等文件暂时不支持。
 
 ### 为什么有些模型不能发图片？
 
