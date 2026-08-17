@@ -5,14 +5,14 @@
 
 一个面向 macOS、Windows 和 Linux 的 Electron 桌面壳，用原生窗口运行官方 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) Web UI。
 
-> 本项目不是对官方 Harness 核心代码的复制或分叉：桌面端在启动时解析本机/托管的 `@deepseek-ai/dsh`，并直接启动官方 `dsh web`。因此 Web UI、插件系统和 CLI 能够保持同一套运行时。
+> 本项目不是对官方 Harness 核心代码的复制或分叉：桌面端在启动时解析本机/托管的 `@deepseek-ai/dsh`，并直接启动官方 `dsh web`。桌面端复用官方 Web 运行时，但不提供官方 CLI 的全部终端入口。
 
 ## 与官方仓库的关系
 
 - 官方仓库：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)
 - 本仓库：[hx876298682-tech/deepseek-harness-desktop](https://github.com/hx876298682-tech/deepseek-harness-desktop)
-- 对比基线：官方仓库 `master` 的提交 `47f9438`（2026-08-13）；本地桌面端 `v0.1.1` 基于独立 Electron 壳实现。
-- 官方项目仍处于 developer preview，可能存在不兼容变更；桌面端每次启动都会重新解析当前可用的 CLI，若在设置页完成 CLI 更新，下一次启动会使用托管目录中的新版本。
+- 对比基线：截至 2026-08-14 对官方仓库 `master` 做人工源码对比；官方基线可在 [`47f9438`](https://github.com/deepseek-ai/deepseek-harness/commit/47f943859bef60e4160492346772ded9b24f765a) 查看。本地桌面端 `v0.1.1` 基于独立 Electron 壳实现。
+- 官方项目仍处于 developer preview，可能存在不兼容变更；桌面端每次启动都会重新解析当前已安装或缓存中的 CLI。只有用户在设置页执行 CLI 更新后，下一次启动才会使用托管目录中的新版本。
 
 ## 相比官方 Web/CLI 版本的优化
 
@@ -24,9 +24,9 @@
 | CLI 发现 | 由用户自行准备并运行 `npx`/`dsh` | 按环境变量、PATH、npx 缓存、全局 npm、npx fallback 的顺序解析；启动时探测版本 | `resolve-dsh.js` |
 | CLI 更新 | 手动执行 npm 命令 | 设置页检查 npm 最新版本，安装到应用托管目录，安装后自动重启 | `main.js`、`preload.cjs` |
 | 桌面应用更新 | 官方仓库不提供 Electron 安装器更新流程 | 从当前桌面仓库 GitHub Releases 检查并选择平台/架构安装包，流式下载并显示进度 | `main.js`、`update-utils.js`、`update-section.js` |
-| 安全边界 | Web UI 在浏览器或本地服务中运行 | `contextIsolation`、`sandbox`、关闭 Node 集成；外部窗口仅允许 `http(s)` 并交给系统浏览器 | `main.js`、`preload.cjs` |
-| 更新链接安全 | 不适用 | IPC 打开外部页面前校验 HTTPS、GitHub 主机和本项目路径，避免任意 URL 跳转 | `main.js` |
-| 多进程生命周期 | 终端进程负责停止服务 | Electron 退出时终止 dsh 进程组，超时后强制回收，避免残留本地服务 | `main.js` |
+| 安全边界 | Web UI 在浏览器或本地服务中运行 | `contextIsolation`、`sandbox`、关闭 Node 集成；新窗口链接仅允许 `http(s)` 并交给系统浏览器 | `main.js`、`preload.cjs` |
+| 更新链接安全 | 不适用 | IPC 打开 Release 页面前校验 HTTPS、GitHub 主机和本项目路径，避免任意 URL 跳转 | `main.js` |
+| 多进程生命周期 | 终端进程负责停止服务 | Electron 退出时尝试终止 dsh 进程组，Unix 下有超时强制回收；Windows 行为需在目标系统验证 | `main.js` |
 | 单实例 | 取决于启动方式 | 使用 Electron single-instance lock，重复启动时恢复并聚焦已有窗口 | `main.js` |
 | 桌面快捷键 | 浏览器行为受 Web composer 拦截影响 | 原生 Edit 菜单和 `before-input-event` 转发 Cmd/Ctrl+C/X/V/A，修复输入框复制粘贴 | `main.js` |
 | 可诊断性 | 主要依赖终端输出 | 将启动、解析、服务异常写入用户数据目录的 `dsh-desktop.log`，并提供菜单入口 | `main.js` |
@@ -41,8 +41,8 @@
 
 ## 功能概览
 
-- 启动并嵌入官方 Harness Web UI，启动端口由 `dsh` 自动分配。
-- 支持通过 `DSH_BIN` 指定 CLI，也支持 npm/npx 缓存和全局安装自动发现。
+- 启动并嵌入官方 Harness Web UI，通过 `--port 0` 请求自动选择空闲端口。
+- 支持通过 `DSH_BIN` 指定 CLI，也支持 npm/npx 缓存和全局安装自动发现；Windows 路径处理已兼容，但仍建议在目标系统执行 smoke test。
 - 设置页面分别管理 `@deepseek-ai/dsh` CLI 与桌面应用更新。
 - GitHub Release 下载使用流式写入、大小校验和进度事件，不会在运行中覆盖当前应用。
 - Electron 安全配置：隔离上下文、禁用 Node 集成、启用 sandbox。
@@ -129,9 +129,9 @@ git push origin v0.1.1
 - 桌面应用目前未配置代码签名和公证；macOS 首次打开可能需要右键选择“打开”。
 - 桌面更新是“下载并打开安装器”，不会自动覆盖正在运行的应用。
 - GitHub API、npm registry 或本地网络不可用时，更新检查会失败，但不会影响已安装版本运行。
-- 下载目前校验响应状态和文件大小，不提供 checksum/签名校验；请只使用可信 Release。
-- 设置页注入依赖官方 Web 的内部插件加载接口，官方 Web 大版本升级后可能需要适配。
-- Windows 的 PATH 分隔符与进程组回收尚未在本机 CI 外完整验证；跨平台发布前建议在对应系统执行 smoke test。
+- 下载目前校验响应状态和文件大小，属于非加密完整性校验，不提供 checksum 或签名校验；请只使用可信 Release。
+- 设置页更新区是通过 preload 注入官方 Web 的内部模块/slot/plugin hook，官方 Web 大版本升级后可能需要适配。
+- Windows 的进程组回收和完整发布流程仍需在目标系统执行 smoke test；解析器已使用平台 PATH 分隔符并支持 Windows 路径，但本机无法替代 Windows 验证。
 
 ## 许可证
 

@@ -2,9 +2,9 @@
 //
 // The desktop app never bundles the harness: it resolves the *installed* dsh
 // CLI at launch time (PATH -> npx cache -> global npm root -> npx fallback)
-// and boots it with the system Node. That is what makes updates "just work":
-// npm install -g @deepseek-ai/dsh (or a fresh npx run) is picked up on the
-// next launch without rebuilding the app.
+// and boots it with the system Node. Installing or updating
+// @deepseek-ai/dsh (or running a fresh npx command) is picked up on the next
+// launch without rebuilding the app.
 //
 // Resolution order:
 //   1. DSH_BIN env var (a path to dsh's lib/bin.js, or a bin name on PATH)
@@ -17,10 +17,13 @@
 
 import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const COMMON_BIN_DIRS = [
+const COMMON_BIN_DIRS = process.platform === "win32" ? [
+  process.env.ProgramFiles ? join(process.env.ProgramFiles, "nodejs") : "C:\\Program Files\\nodejs",
+  process.env.APPDATA ? join(process.env.APPDATA, "npm") : null,
+].filter(Boolean) : [
   "/usr/local/bin", // official macOS Node installer
   "/opt/homebrew/bin", // Apple Silicon Homebrew
   "/usr/bin",
@@ -29,7 +32,7 @@ const COMMON_BIN_DIRS = [
 /** Directories that may hold node/npm/dsh, PATH first, then well-known spots. */
 export function candidateBinDirs() {
   const dirs = new Set();
-  for (const p of (process.env.PATH || "").split(":")) if (p) dirs.add(p);
+  for (const p of (process.env.PATH || "").split(delimiter)) if (p) dirs.add(p);
   for (const d of COMMON_BIN_DIRS) dirs.add(d);
   const nvmRoot = process.env.NVM_DIR || join(homedir(), ".nvm");
   try {
@@ -43,9 +46,13 @@ export function candidateBinDirs() {
 }
 
 export function findInDirs(dirs, name) {
+  const names = [name];
+  if (process.platform === "win32" && !/\.(?:cmd|exe|bat)$/i.test(name)) names.push(name + ".cmd", name + ".exe", name + ".bat");
   for (const d of dirs) {
-    const p = join(d, name);
-    try { const st = statSync(p); if (st.isFile() || st.isSymbolicLink()) return p; } catch { /* next */ }
+    for (const candidateName of names) {
+      const p = join(d, candidateName);
+      try { const st = statSync(p); if (st.isFile() || st.isSymbolicLink()) return p; } catch { /* next */ }
+    }
   }
   return null;
 }
@@ -124,7 +131,7 @@ export function resolveDsh() {
   // 1. env override
   if (process.env.DSH_BIN) {
     const raw = process.env.DSH_BIN;
-    const candidate = raw.includes("/") ? raw : realDshBinFromCommand(raw);
+    const candidate = isAbsolute(raw) || raw.includes("/") || raw.includes("\\") ? raw : realDshBinFromCommand(raw);
     tryCandidate(candidate, "env");
   }
   // 2. PATH shim
@@ -135,7 +142,7 @@ export function resolveDsh() {
   if (!result.ok) tryCandidate(globalDshEntry(), "global");
   // 5. npx fallback (resolved at spawn time)
   if (!result.ok) {
-    const npm = findInDirs(candidateBinDirs(), "npm") || (nodePath ? join(dirname(nodePath), "npm") : null);
+    const npm = findInDirs(candidateBinDirs(), "npm") || (nodePath ? findInDirs([dirname(nodePath)], "npm") : null);
     if (npm && existsSync(npm)) {
       result.npxFallback = true;
       result.ok = true;
