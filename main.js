@@ -114,6 +114,18 @@ function createWindow() {
     if (url.startsWith("http://") || url.startsWith("https://")) shell.openExternal(url);
     return { action: "deny" };
   });
+  // The Harness composer owns the DOM paste event and calls preventDefault()
+  // to normalize pasted text. Forward system edit shortcuts directly to
+  // Chromium so Cmd/Ctrl+C/V still reach the focused textarea/contenteditable.
+  win.webContents.on("before-input-event", (event, input) => {
+    if ((!input.meta && !input.control) || input.alt) return;
+    const command = input.key?.toLowerCase();
+    const commands = { c: "copy", x: "cut", v: "paste", a: "selectAll" };
+    const method = commands[command];
+    if (!method || !win || win.isDestroyed()) return;
+    event.preventDefault();
+    win.webContents[method]();
+  });
   win.on("closed", () => { win = null; });
   Menu.setApplicationMenu(buildMenu());
 }
@@ -329,7 +341,24 @@ function failAndQuit(message) {
 }
 
 function buildMenu() {
-  return Menu.buildFromTemplate([{ label: "DeepSeek Harness", submenu: [{ label: "About DeepSeek Harness Desktop", click: () => dialog.showMessageBox(win, { type: "info", title: "About", message: "DeepSeek Harness Desktop", detail: "dsh v" + (dshInfo?.version || "?") + "\nDesktop shell v" + app.getVersion(), buttons: ["OK"] }) }, { type: "separator" }, { label: "Check dsh version", click: async () => { try { const r = await checkDshUpdate(); await dialog.showMessageBox(win, { type: "info", title: "dsh version", message: "当前版本 v" + r.currentVersion, detail: "最新版本 v" + r.latestVersion, buttons: ["OK"] }); } catch (e) { dialog.showErrorBox("dsh version", e.message); } } }, { type: "separator" }, { role: "quit" }] }, { label: "View", submenu: [{ label: "Reload", accelerator: "CmdOrCtrl+R", click: () => win?.webContents.reload() }, { label: "Force Reload", accelerator: "CmdOrCtrl+Shift+R", click: () => win?.webContents.reloadIgnoringCache() }, { label: "Toggle Developer Tools", accelerator: "Alt+CmdOrCtrl+I", click: () => win?.webContents.toggleDevTools() }, { type: "separator" }, { label: "Open in Browser", click: () => { if (currentUrl) shell.openExternal(currentUrl); } }] }, { label: "Help", submenu: [{ label: "How to update dsh", click: () => dialog.showMessageBox(win, { type: "info", title: "Updating dsh", message: "请在设置页面点击更新按钮。", buttons: ["OK"] }) }, { label: "Open log file", click: () => { if (logPath) shell.openPath(logPath); } }] }]);
+  // A custom application menu replaces Electron's default menu. Keep the
+  // native Edit roles so Cmd/Ctrl+C/V (and the text-field context actions)
+  // continue to work in the renderer on every platform.
+  const editMenu = {
+    label: "Edit",
+    submenu: [
+      { role: "undo" },
+      { role: "redo" },
+      { type: "separator" },
+      { role: "cut" },
+      { role: "copy" },
+      { role: "paste" },
+      { role: "pasteAndMatchStyle" },
+      { type: "separator" },
+      { role: "selectAll" }
+    ]
+  };
+  return Menu.buildFromTemplate([{ label: "DeepSeek Harness", submenu: [{ label: "About DeepSeek Harness Desktop", click: () => dialog.showMessageBox(win, { type: "info", title: "About", message: "DeepSeek Harness Desktop", detail: "dsh v" + (dshInfo?.version || "?") + "\nDesktop shell v" + app.getVersion(), buttons: ["OK"] }) }, { type: "separator" }, { label: "Check dsh version", click: async () => { try { const r = await checkDshUpdate(); await dialog.showMessageBox(win, { type: "info", title: "dsh version", message: "当前版本 v" + r.currentVersion, detail: "最新版本 v" + r.latestVersion, buttons: ["OK"] }); } catch (e) { dialog.showErrorBox("dsh version", e.message); } } }, { type: "separator" }, { role: "quit" }] }, editMenu, { label: "View", submenu: [{ label: "Reload", accelerator: "CmdOrCtrl+R", click: () => win?.webContents.reload() }, { label: "Force Reload", accelerator: "CmdOrCtrl+Shift+R", click: () => win?.webContents.reloadIgnoringCache() }, { label: "Toggle Developer Tools", accelerator: "Alt+CmdOrCtrl+I", click: () => win?.webContents.toggleDevTools() }, { type: "separator" }, { label: "Open in Browser", click: () => { if (currentUrl) shell.openExternal(currentUrl); } }] }, { label: "Help", submenu: [{ label: "How to update dsh", click: () => dialog.showMessageBox(win, { type: "info", title: "Updating dsh", message: "请在设置页面点击更新按钮。", buttons: ["OK"] }) }, { label: "Open log file", click: () => { if (logPath) shell.openPath(logPath); } }] }]);
 }
 
 function killServer() {

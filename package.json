@@ -23,8 +23,9 @@
     "appId": "ai.deepseek.harness.desktop",
     "productName": "DeepSeek Harness Desktop",
     "asar": true,
-    "files": ["main.js", "preload.cjs", "resolve-dsh.js", "update-utils.js", "update-section.js", "README.md"],
+    "files": ["main.js", "preload.cjs", "resolve-dsh.js", "update-utils.js", "update-section.js", "README.md", "LICENSE"],
     "mac": {
+      "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools",
       "artifactName": "DeepSeekHarnessDesktop-${version}-${arch}.${ext}",
       "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }]
