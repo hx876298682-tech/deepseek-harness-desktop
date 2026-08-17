@@ -122,8 +122,8 @@ npm run dist:win
 推送 `v*` 标签会触发 `.github/workflows/release.yml`，在 macOS arm64、macOS x64、Linux x64 和 Windows x64 构建并发布 GitHub Release：
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 安装包和本地构建目录默认被 `.gitignore` 排除，不直接提交到源仓库。
