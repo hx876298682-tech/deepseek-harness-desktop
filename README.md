@@ -5,13 +5,25 @@
 
 一个面向 macOS、Windows 和 Linux 的 Electron 桌面壳，用原生窗口运行官方 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) Web UI。
 
+## 实际界面
+
+以下截图来自 DeepSeek Harness Desktop 的实际运行界面。
+
+### 主界面
+
+![DeepSeek Harness Desktop 主界面](docs/images/main-interface.png)
+
+### 设置与更新
+
+![DeepSeek Harness Desktop 设置与更新页面](docs/images/settings-updates.png)
+
 > 本项目不是对官方 Harness 核心代码的复制或分叉：桌面端在启动时解析本机/托管的 `@deepseek-ai/dsh`，并直接启动官方 `dsh web`。桌面端复用官方 Web 运行时，但不提供官方 CLI 的全部终端入口。
 
 ## 与官方仓库的关系
 
 - 官方仓库：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)
 - 本仓库：[hx876298682-tech/deepseek-harness-desktop](https://github.com/hx876298682-tech/deepseek-harness-desktop)
-- 对比基线：截至 2026-08-14 对官方仓库 `master` 做人工源码对比；官方基线可在 [`47f9438`](https://github.com/deepseek-ai/deepseek-harness/commit/47f943859bef60e4160492346772ded9b24f765a) 查看。本地桌面端 `v0.1.1` 基于独立 Electron 壳实现。
+- 对比基线：截至 2026-08-14 对官方仓库 `master` 做人工源码对比；官方基线可在 [`47f9438`](https://github.com/deepseek-ai/deepseek-harness/commit/47f943859bef60e4160492346772ded9b24f765a) 查看。本地桌面端 `v0.1.2` 基于独立 Electron 壳实现。
 - 官方项目仍处于 developer preview，可能存在不兼容变更；桌面端每次启动都会重新解析当前已安装或缓存中的 CLI。只有用户在设置页执行 CLI 更新后，下一次启动才会使用托管目录中的新版本。
 
 ## 相比官方 Web/CLI 版本的优化
@@ -63,6 +75,7 @@
 ├── update-section.js       # 设置页更新区块源码
 ├── _extracted/             # 可复现的应用源快照
 ├── build/                  # 应用图标等构建资源
+├── docs/images/            # README 实际运行截图
 └── .github/workflows/      # Release 构建矩阵
 ```
 
