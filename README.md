@@ -48,6 +48,7 @@
 - GitHub Release 下载使用流式写入、大小校验和进度事件，不会在运行中覆盖当前应用。
 - Electron 安全配置：隔离上下文、禁用 Node 集成、启用 sandbox。
 - 当前桌面入口只启动官方 `web` profile；CLI 的 headless、插件开发等其他入口仍请直接使用官方 CLI。
+- 非 DeepSeek Provider 默认声明支持图片输入，让服务端返回真实的模型能力错误；DeepSeek Provider 保持官方纯文本限制。
 - 单实例、原生编辑菜单、外部链接拦截、启动日志和 smoke test。
 
 ## 目录结构
@@ -135,6 +136,7 @@ git push origin v0.1.1
 - GitHub API、npm registry 或本地网络不可用时，更新检查会失败，但不会影响已安装版本运行；没有托管缓存时，首次自动准备也无法完成。
 - Node.js 自动下载会校验官方 SHA-256 摘要；当前托管 Node.js 版本为 22 LTS，同时接受已安装的 Node.js 22.19+ 或 24；桌面 Release 下载目前只校验响应状态和文件大小，不提供 checksum 或签名校验，请只使用可信 Release。
 - 设置页更新区是通过 preload 注入官方 Web 的内部模块/slot/plugin hook，官方 Web 大版本升级后可能需要适配。
+- 非 DeepSeek Provider 的默认图片能力会写入 `$DSH_HOME/settings.yaml` 的 `defaultInput: [text, image]`；已有显式 `defaultInput` 不会覆盖，DeepSeek Provider 不会修改。
 - Windows 的进程组回收和完整发布流程仍需在目标系统执行 smoke test；解析器已使用平台 PATH 分隔符并支持 Windows 路径，但本机无法替代 Windows 验证。
 
 ## 许可证

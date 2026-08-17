@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { candidateBinDirs, findInDirs, findNode, resolveDsh } from "./resolve-dsh.js";
 import { compareVersions, parseVersion, pickDesktopAsset } from "./update-utils.js";
 import { detectNodeVersion, ensureNodeRuntime, isSupportedNodeVersion, runtimePathEnv } from "./runtime.js";
+import { ensureDefaultImageInputSettings, watchDefaultImageInputSettings } from "./image-input-defaults.js";
 
 const SMOKE_TEST = process.argv.includes("--smoke-test");
 const SMOKE_TIMEOUT_MS = 120000;
@@ -32,6 +33,7 @@ let logPath = null;
 let updateInFlight = false;
 let desktopUpdateInFlight = false;
 let desktopReleaseCache = null;
+let stopImageSettingsWatch = null;
 
 function log(msg) {
   const line = "[" + new Date().toISOString() + "] " + msg;
@@ -63,6 +65,8 @@ async function run() {
   createWindow();
 
   try {
+    ensureDefaultImageInputSettings({ log });
+    stopImageSettingsWatch = watchDefaultImageInputSettings({ log });
     const managedRoot = join(app.getPath("userData"), "dsh");
     const runtime = await ensureRuntime();
     process.env.DSH_DESKTOP_NODE = runtime.nodePath;
@@ -413,6 +417,8 @@ function killServer() {
 function shutdown(exitCode) {
   if (quitting) return;
   quitting = true;
+  stopImageSettingsWatch?.();
+  stopImageSettingsWatch = null;
   killServer();
   setTimeout(() => app.exit(exitCode), 150);
 }
