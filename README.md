@@ -12,7 +12,7 @@
 - 官方仓库：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)
 - 本仓库：[hx876298682-tech/deepseek-harness-desktop](https://github.com/hx876298682-tech/deepseek-harness-desktop)
 - 对比基线：官方仓库 `master` 的提交 `47f9438`（2026-08-13）；本地桌面端 `v0.1.1` 基于独立 Electron 壳实现。
-- 官方项目仍处于 developer preview，可能存在不兼容变更；桌面端会在下次启动时使用解析到的最新 CLI。
+- 官方项目仍处于 developer preview，可能存在不兼容变更；桌面端每次启动都会重新解析当前可用的 CLI，若在设置页完成 CLI 更新，下一次启动会使用托管目录中的新版本。
 
 ## 相比官方 Web/CLI 版本的优化
 
@@ -36,7 +36,7 @@
 
 1. **不打包 Harness 核心**：桌面端只负责窗口和进程管理，避免桌面安装包与官方 Web bundle 分叉。
 2. **更新分层**：CLI 更新可以安装后自动重启；桌面安装器涉及替换运行中的应用，下载后打开安装包并由用户完成安装。
-3. **跨平台资产选择**：根据平台、CPU 架构和扩展名评分，优先选择 macOS DMG / Windows EXE 或 MSI / Linux AppImage、DEB、RPM；排除 blockmap、校验文件和元数据。
+3. **跨平台资产选择**：根据平台、CPU 架构和扩展名评分，优先选择 macOS DMG/ZIP、Windows EXE/MSI 或 Linux AppImage/DEB/RPM；当前 CI 默认构建并发布 macOS DMG、Windows NSIS 和 Linux AppImage，其他格式可由后续 Release 资产提供。
 4. **DMG 安全提示**：从挂载的 DMG 直接运行时阻止更新，并提示先拖入 `Applications`，避免覆盖只读挂载镜像。
 
 ## 功能概览
@@ -46,6 +46,7 @@
 - 设置页面分别管理 `@deepseek-ai/dsh` CLI 与桌面应用更新。
 - GitHub Release 下载使用流式写入、大小校验和进度事件，不会在运行中覆盖当前应用。
 - Electron 安全配置：隔离上下文、禁用 Node 集成、启用 sandbox。
+- 当前桌面入口只启动官方 `web` profile；CLI 的 headless、插件开发等其他入口仍请直接使用官方 CLI。
 - 单实例、原生编辑菜单、外部链接拦截、启动日志和 smoke test。
 
 ## 目录结构
@@ -128,6 +129,9 @@ git push origin v0.1.1
 - 桌面应用目前未配置代码签名和公证；macOS 首次打开可能需要右键选择“打开”。
 - 桌面更新是“下载并打开安装器”，不会自动覆盖正在运行的应用。
 - GitHub API、npm registry 或本地网络不可用时，更新检查会失败，但不会影响已安装版本运行。
+- 下载目前校验响应状态和文件大小，不提供 checksum/签名校验；请只使用可信 Release。
+- 设置页注入依赖官方 Web 的内部插件加载接口，官方 Web 大版本升级后可能需要适配。
+- Windows 的 PATH 分隔符与进程组回收尚未在本机 CI 外完整验证；跨平台发布前建议在对应系统执行 smoke test。
 
 ## 许可证
 
