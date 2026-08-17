@@ -9,7 +9,7 @@
   "scripts": {
     "start": "electron .",
     "start:smoke": "electron . --smoke-test",
-    "test:update-utils": "node --test update-utils.test.js",
+    "test:update-utils": "node --test update-utils.test.js runtime.test.js",
     "dist:mac-arm64": "electron-builder --mac dmg --arm64",
     "dist:mac-x64": "electron-builder --mac dmg --x64",
     "dist:linux": "electron-builder --linux AppImage --x64",
@@ -23,7 +23,7 @@
     "appId": "ai.deepseek.harness.desktop",
     "productName": "DeepSeek Harness Desktop",
     "asar": true,
-    "files": ["main.js", "preload.cjs", "resolve-dsh.js", "update-utils.js", "update-section.js", "README.md", "LICENSE"],
+    "files": ["main.js", "preload.cjs", "resolve-dsh.js", "runtime.js", "update-utils.js", "update-section.js", "README.md", "LICENSE"],
     "mac": {
       "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools",

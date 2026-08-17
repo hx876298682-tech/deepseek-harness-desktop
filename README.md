@@ -43,6 +43,7 @@
 
 - 启动并嵌入官方 Harness Web UI，通过 `--port 0` 请求自动选择空闲端口。
 - 支持通过 `DSH_BIN` 指定 CLI，也支持 npm/npx 缓存和全局安装自动发现；Windows 路径处理已兼容，但仍建议在目标系统执行 smoke test。
+- 首次启动自动检测 Node.js/npm；缺少时下载并托管 Node.js 22，缺少 dsh 时自动安装 `@deepseek-ai/dsh`，无需用户预装 Harness。
 - 设置页面分别管理 `@deepseek-ai/dsh` CLI 与桌面应用更新。
 - GitHub Release 下载使用流式写入、大小校验和进度事件，不会在运行中覆盖当前应用。
 - Electron 安全配置：隔离上下文、禁用 Node 集成、启用 sandbox。
@@ -68,20 +69,23 @@
 
 ### 环境要求
 
-- Node.js（推荐 LTS；运行官方 dsh 时请以官方仓库当前要求为准）
-- npm
-- 已安装的 `@deepseek-ai/dsh`，或可用的 `npx`
+- Node.js 22+（若未安装，桌面端首次启动会从 nodejs.org 自动下载托管版本）
+- 网络连接（首次启动需要下载 Node.js 或 `@deepseek-ai/dsh`；Node.js 与 dsh 都已有托管缓存时可离线启动）
+- 开发和源码运行需要 npm；发布安装包的普通用户不需要预先安装 dsh
 
 ```bash
 npm ci
 npm start
 ```
 
-如果没有全局安装 CLI，桌面端会尝试通过 npx 启动：
+首次启动时，桌面端会自动执行以下准备流程：
 
-```bash
-npx @deepseek-ai/dsh web
-```
+1. 检测当前系统是否有满足官方要求的 Node.js 和 npm。
+2. 如果没有，自动从 Node.js 官方发行站下载 Node.js 22 LTS，并安装到应用用户数据目录。
+3. 检测 `@deepseek-ai/dsh`；如果没有，使用 npm 自动安装到应用用户数据目录。
+4. 启动官方 `dsh web`，后续启动复用托管版本。
+
+Node.js 安装包会校验 Node.js 官方提供的 SHA-256 文件摘要。网络不可用且没有本地缓存时，首次准备会失败并写入 `dsh-desktop.log`。
 
 也可以显式指定入口进行调试：
 
@@ -128,8 +132,8 @@ git push origin v0.1.1
 - 官方 Harness 仍在快速迭代，CLI/Web API 可能发生 breaking changes。
 - 桌面应用目前未配置代码签名和公证；macOS 首次打开可能需要右键选择“打开”。
 - 桌面更新是“下载并打开安装器”，不会自动覆盖正在运行的应用。
-- GitHub API、npm registry 或本地网络不可用时，更新检查会失败，但不会影响已安装版本运行。
-- 下载目前校验响应状态和文件大小，属于非加密完整性校验，不提供 checksum 或签名校验；请只使用可信 Release。
+- GitHub API、npm registry 或本地网络不可用时，更新检查会失败，但不会影响已安装版本运行；没有托管缓存时，首次自动准备也无法完成。
+- Node.js 自动下载会校验官方 SHA-256 摘要；当前托管 Node.js 版本为 22 LTS，同时接受已安装的 Node.js 22.19+ 或 24；桌面 Release 下载目前只校验响应状态和文件大小，不提供 checksum 或签名校验，请只使用可信 Release。
 - 设置页更新区是通过 preload 注入官方 Web 的内部模块/slot/plugin hook，官方 Web 大版本升级后可能需要适配。
 - Windows 的进程组回收和完整发布流程仍需在目标系统执行 smoke test；解析器已使用平台 PATH 分隔符并支持 Windows 路径，但本机无法替代 Windows 验证。
 

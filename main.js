@@ -10,8 +10,9 @@ import { mkdir } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
-import { resolveDsh } from "./resolve-dsh.js";
+import { candidateBinDirs, findInDirs, findNode, resolveDsh } from "./resolve-dsh.js";
 import { compareVersions, parseVersion, pickDesktopAsset } from "./update-utils.js";
+import { detectNodeVersion, ensureNodeRuntime, isSupportedNodeVersion, runtimePathEnv } from "./runtime.js";
 
 const SMOKE_TEST = process.argv.includes("--smoke-test");
 const SMOKE_TIMEOUT_MS = 120000;
@@ -56,12 +57,28 @@ if (!gotLock) {
 
 async function run() {
   if (process.env.DSH_DESKTOP_USER_DATA) app.setPath("userData", process.env.DSH_DESKTOP_USER_DATA);
-  const managedBin = join(app.getPath("userData"), "dsh", "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js");
-  if (existsSync(managedBin)) process.env.DSH_BIN = managedBin;
   logPath = join(app.getPath("userData"), "dsh-desktop.log");
   try { appendFileSync(logPath, "--- launch ---" + String.fromCharCode(10)); } catch { /* ignore */ }
   const timer = SMOKE_TEST ? setTimeout(() => { log("SMOKE_TIMEOUT"); shutdown(1); }, SMOKE_TIMEOUT_MS) : null;
   createWindow();
+
+  try {
+    const managedRoot = join(app.getPath("userData"), "dsh");
+    const runtime = await ensureRuntime();
+    process.env.DSH_DESKTOP_NODE = runtime.nodePath;
+    process.env.DSH_DESKTOP_NPM = runtime.npmPath;
+    process.env.PATH = runtimePathEnv(runtime);
+    const managedBin = join(managedRoot, "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js");
+    if (existsSync(managedBin)) process.env.DSH_BIN = managedBin;
+    else {
+      const existing = resolveDsh();
+      if (!existing.ok || existing.npxFallback) await installManagedDsh(managedRoot, runtime.npmPath);
+    }
+  } catch (error) {
+    log("runtime setup failed: " + error.message);
+    failAndQuit("首次启动准备失败：" + error.message);
+    return;
+  }
 
   dshInfo = resolveDsh();
   if (!dshInfo.ok) {
@@ -92,6 +109,27 @@ async function run() {
   }
 }
 
+async function ensureRuntime() {
+  const configuredNode = process.env.DSH_DESKTOP_NODE;
+  const systemNode = configuredNode || findNode();
+  const systemVersion = detectNodeVersion(systemNode);
+  if (systemNode && isSupportedNodeVersion(systemVersion)) {
+    const npmPath = process.env.DSH_DESKTOP_NPM || findInDirs(candidateBinDirs(), "npm") || findInDirs([dirname(systemNode)], "npm");
+    if (npmPath && existsSync(npmPath)) return { nodePath: systemNode, npmPath, managed: false, version: systemVersion };
+  }
+  return ensureNodeRuntime(app.getPath("userData"), log);
+}
+
+async function installManagedDsh(installRoot, npmPath) {
+  if (!npmPath || !existsSync(npmPath)) throw new Error("托管 Node.js 的 npm 不可用");
+  log("未找到官方 dsh，正在自动安装 @deepseek-ai/dsh");
+  await runCommand(npmPath, ["install", "--prefix", installRoot, "--no-fund", "--no-audit", UPDATE_PACKAGE + "@latest"], 300000);
+  const managedBin = join(installRoot, "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js");
+  if (!existsSync(managedBin)) throw new Error("dsh 安装完成但找不到 CLI 入口");
+  process.env.DSH_BIN = managedBin;
+  log("@deepseek-ai/dsh 已自动安装");
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1280,
@@ -108,7 +146,7 @@ function createWindow() {
       preload: join(dirname(fileURLToPath(import.meta.url)), "preload.cjs")
     }
   });
-  const loading = "<!doctype html><html><body style=\"margin:0;background:#0d0d0f;color:#9aa0ab;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh\"><div style=\"text-align:center\"><div style=\"font-size:15px\">Starting DeepSeek Harness…</div><div style=\"margin-top:10px;font-size:12px;opacity:.6\">booting dsh web server</div></div></body></html>";
+  const loading = "<!doctype html><html><body style=\"margin:0;background:#0d0d0f;color:#9aa0ab;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh\"><div style=\"text-align:center\"><div style=\"font-size:15px\">Starting DeepSeek Harness…</div><div style=\"margin-top:10px;font-size:12px;opacity:.6\">checking Node.js and preparing dsh runtime</div></div></body></html>";
   win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(loading)).catch(() => {});
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("http://") || url.startsWith("https://")) shell.openExternal(url);
@@ -184,6 +222,7 @@ function runCommand(command, args, timeoutMs = 120000) {
     const commandChild = spawn(command, args, {
       cwd: process.env.DSH_DESKTOP_SERVER_CWD || homedir(),
       env: { ...process.env, PATH: [dirname(command), "/usr/local/bin", "/opt/homebrew/bin", process.env.PATH].filter(Boolean).join(process.platform === "win32" ? ";" : ":"), NO_UPDATE_NOTIFIER: "1", NPM_CONFIG_UPDATE_NOTIFIER: "false" },
+      shell: process.platform === "win32",
       stdio: ["ignore", "pipe", "pipe"]
     });
     let stdout = "";
