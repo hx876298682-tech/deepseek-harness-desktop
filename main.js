@@ -14,6 +14,7 @@ import { candidateBinDirs, findInDirs, findNode, resolveDsh } from "./resolve-ds
 import { compareVersions, parseVersion, pickDesktopAsset } from "./update-utils.js";
 import { detectNodeVersion, ensureNodeRuntime, isSupportedNodeVersion, runtimePathEnv } from "./runtime.js";
 import { ensureDefaultImageInputSettings, watchDefaultImageInputSettings } from "./image-input-defaults.js";
+import { DSH_PLUGIN_TOPIC_API, normalizeForumPlugins } from "./forum-plugin-utils.js";
 
 const SMOKE_TEST = process.argv.includes("--smoke-test");
 const SMOKE_TIMEOUT_MS = 120000;
@@ -42,6 +43,12 @@ function log(msg) {
     try { appendFileSync(logPath, line + String.fromCharCode(10)); } catch { /* ignore */ }
   }
 }
+
+ipcMain.handle("dsh-forum-plugins:list", async () => {
+  const response = await fetch(DSH_PLUGIN_TOPIC_API, { headers: { Accept: "application/vnd.github+json", "User-Agent": "deepseek-harness-desktop" } });
+  if (!response.ok) throw new Error(`GitHub 返回了错误：${response.status}`);
+  return normalizeForumPlugins(await response.json());
+});
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {

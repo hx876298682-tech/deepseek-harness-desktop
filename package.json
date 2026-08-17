@@ -1,7 +1,7 @@
 {
   "name": "deepseek-harness-desktop",
   "productName": "DeepSeek Harness Desktop",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Native Electron desktop shell for the DeepSeek Harness Web UI.",
   "main": "main.js",
   "type": "module",
@@ -9,7 +9,7 @@
   "scripts": {
     "start": "electron .",
     "start:smoke": "electron . --smoke-test",
-    "test:update-utils": "node --test update-utils.test.js runtime.test.js image-input-defaults.test.js text-file-utils.test.js",
+    "test:update-utils": "node --test update-utils.test.js runtime.test.js image-input-defaults.test.js text-file-utils.test.js forum-plugin-utils.test.js",
     "dist:mac-arm64": "electron-builder --mac dmg --arm64",
     "dist:mac-x64": "electron-builder --mac dmg --x64",
     "dist:linux": "electron-builder --linux AppImage --x64",
@@ -23,7 +23,7 @@
     "appId": "ai.deepseek.harness.desktop",
     "productName": "DeepSeek Harness Desktop",
     "asar": true,
-    "files": ["main.js", "preload.cjs", "resolve-dsh.js", "runtime.js", "image-input-defaults.js", "text-file-utils.js", "update-utils.js", "update-section.js", "README.md", "LICENSE"],
+    "files": ["main.js", "preload.cjs", "resolve-dsh.js", "runtime.js", "image-input-defaults.js", "text-file-utils.js", "forum-plugin-utils.js", "update-utils.js", "update-section.js", "README.md", "LICENSE"],
     "mac": {
       "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools",

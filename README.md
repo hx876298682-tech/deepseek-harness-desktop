@@ -2,7 +2,7 @@
 
 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 变成一个更方便使用的桌面应用。
 
-当前版本：`v0.1.3`
+当前版本：`v0.1.4`
 
 支持 macOS、Windows 和 Linux。
 
@@ -22,6 +22,7 @@
 - 第一次打开时，自动准备 Node.js 和 DeepSeek Harness
 - 不需要用户提前安装 DeepSeek Harness
 - 支持在设置里更新 Harness 和桌面应用
+- 在设置 → 插件中增加“论坛插件”，可以浏览 GitHub 上的 DSH 插件
 - 支持复制、粘贴和常用快捷键
 - 支持发送图片
   - DeepSeek 模型保持官方的纯文本限制
@@ -128,6 +129,8 @@ dsh-desktop.log
 本项目是官方 DeepSeek Harness 的桌面外壳，不是官方 Harness 核心代码的复制版。官方项目仍在持续开发中，后续可能会有功能变化。
 
 官方仓库：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)
+
+DSH 插件论坛：[github.com/topics/dsh-plugin](https://github.com/topics/dsh-plugin)
 
 本项目仓库：[deepseek-harness-desktop](https://github.com/hx876298682-tech/deepseek-harness-desktop)
 
