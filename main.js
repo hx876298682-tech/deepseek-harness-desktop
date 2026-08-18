@@ -16,6 +16,7 @@ import { detectNodeVersion, ensureNodeRuntime, isSupportedNodeVersion, runtimePa
 import { ensureDefaultImageInputSettings, watchDefaultImageInputSettings } from "./image-input-defaults.js";
 import { DSH_PLUGIN_TOPIC_API, normalizeForumPlugins } from "./forum-plugin-utils.js";
 import { downloadFilename, installedTarget, updateCommand } from "./desktop-update-helper.js";
+import { fallbackAsset, isGitHubRateLimit, latestTagFromLocation } from "./github-release-fallback.js";
 
 const SMOKE_TEST = process.argv.includes("--smoke-test");
 const SMOKE_TIMEOUT_MS = 120000;
@@ -277,6 +278,22 @@ async function fetchGitHubJson(url) {
   try { return JSON.parse(text); } catch { throw new Error("GitHub 返回了无效的 JSON"); }
 }
 
+async function fetchLatestReleaseFallback() {
+  const response = await fetch("https://github.com/" + DESKTOP_REPOSITORY + "/releases/latest", {
+    redirect: "manual",
+    headers: { "User-Agent": "deepseek-harness-desktop" }
+  });
+  const location = response.headers.get("location");
+  const latestVersion = latestTagFromLocation(location);
+  if (!latestVersion) throw new Error("无法从 GitHub Releases 页面获取最新版本");
+  const asset = fallbackAsset({ version: latestVersion, platform: process.platform, arch: process.arch, repository: DESKTOP_REPOSITORY });
+  return {
+    tag_name: "v" + latestVersion,
+    html_url: "https://github.com/" + DESKTOP_REPOSITORY + "/releases/tag/v" + latestVersion,
+    assets: asset ? [asset] : []
+  };
+}
+
 function canWriteInstalledApp() {
   try {
     const target = installedTarget({ platform: process.platform, execPath: process.execPath });
@@ -293,9 +310,12 @@ async function checkDesktopUpdate() {
   try {
     release = await fetchGitHubJson(DESKTOP_RELEASES_API);
   } catch (error) {
-    if (error.status !== 404) throw error;
-    const releases = await fetchGitHubJson(DESKTOP_RELEASES_LIST_API);
-    release = Array.isArray(releases) ? releases.find((item) => !item?.draft && !item?.prerelease) : null;
+    if (isGitHubRateLimit(error)) {
+      release = await fetchLatestReleaseFallback();
+    } else if (error.status === 404) {
+      const releases = await fetchGitHubJson(DESKTOP_RELEASES_LIST_API);
+      release = Array.isArray(releases) ? releases.find((item) => !item?.draft && !item?.prerelease) : null;
+    } else throw error;
   }
   if (!release) {
     const result = { currentVersion, latestVersion: null, hasUpdate: false, available: false, releaseUrl: releasesUrl, message: "还没有发布桌面应用版本" };
