@@ -2,7 +2,7 @@
 
 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 变成一个更方便使用的桌面应用。
 
-当前版本：`v0.1.4`
+当前版本：`v0.1.5`
 
 支持 macOS、Windows 和 Linux。
 

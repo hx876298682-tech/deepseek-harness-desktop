@@ -97,8 +97,8 @@ const TEXT_FILES_WORLD = String.raw`(() => {
 webFrame.executeJavaScript(TEXT_FILES_WORLD).catch(() => {});
 
 const FORUM_PLUGINS_WORLD = String.raw`(() => {
-  if (window.__DSH_DESKTOP_FORUM_PLUGINS__) return;
-  window.__DSH_DESKTOP_FORUM_PLUGINS__ = true;
+  if (window.__DSH_DESKTOP_FORUM_PLUGINS_UI__) return;
+  window.__DSH_DESKTOP_FORUM_PLUGINS_UI__ = true;
   const api = window.__DSH_DESKTOP_FORUM_PLUGINS__;
   const css = "[data-dsh-forum-panel]{color:var(--dsw-alias-label-primary);padding:4px 0}[data-dsh-forum-grid]{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}[data-dsh-forum-card]{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;padding:14px;min-height:120px;display:flex;flex-direction:column;gap:8px;background:var(--dsw-alias-fill-white)}[data-dsh-forum-card] strong{font-size:15px;line-height:22px}[data-dsh-forum-card] p{color:var(--dsw-alias-label-secondary);font-size:13px;line-height:20px;margin:0;flex:1;word-break:break-word}[data-dsh-forum-card] a{color:var(--dsw-alias-label-primary);font-size:12px;text-decoration:none}[data-dsh-forum-state]{color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:22px}[data-dsh-forum-error]{color:var(--dsw-alias-state-error-primary);font-size:14px;line-height:22px}[data-dsh-forum-refresh]{border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-primary);border-radius:8px;padding:6px 12px;cursor:pointer;margin-bottom:12px}";
   const isPluginTabList = (list) => Array.from(list.querySelectorAll("[role=tab]")).some(tab => /插件配置|plugin configuration/i.test(tab.textContent || ""));
