@@ -70,7 +70,8 @@
           if (!result.hasUpdate) { setPhase("current"); show("当前已是最新版本。", "ok"); return; }
           if (desktop && result.runningFromMountedImage) { setPhase("blocked"); show("当前应用从 DMG 挂载盘运行，请先拖入 Applications 文件夹。", "err"); return; }
           if (desktop && !result.available) { setPhase("no-asset"); show(result.message || "有新版本，但没有当前平台安装包。", "err"); return; }
-          if (desktop) { setPhase("ready"); show("发现 v" + result.latestVersion + "，点击“下载安装包”继续。", "ok"); return; }
+          if (desktop && result.canAutoUpdate === false) { setPhase("blocked"); show("当前安装位置不支持自动更新，请打开发布页手动安装。", "err"); return; }
+           if (desktop) { setPhase("ready"); show("发现 v" + result.latestVersion + "，点击“自动更新并重启”继续。", "ok"); return; }
           setPhase("downloading"); show("发现新版本，正在下载安装…");
           const installed = await updater.install(); setPhase("installed"); show("已安装 v" + installed.version + "，应用即将重启…", "ok");
         } catch (error) { setPhase("error"); show("更新失败：" + (error?.message || String(error)), "err"); }
@@ -78,10 +79,10 @@
       const install = async () => {
         if (!desktop || phase !== "ready") return;
         setPhase("downloading"); setProgress(null); show("正在下载安装包…");
-        try { const installed = await updater.installDesktop(); setPhase("installed"); show(installed.message || "安装包已打开，请完成安装后重启应用。", "ok"); }
+        try { const installed = await updater.installDesktop(); setPhase("installed"); show(installed.message || "下载完成，应用即将自动更新并重启。", "ok"); }
         catch (error) { setPhase("error"); show("更新失败：" + (error?.message || String(error)), "err"); }
       };
-      const label = phase === "checking" ? "检查中…" : phase === "downloading" ? "下载中…" : phase === "ready" ? "下载安装包" : phase === "current" ? "重新检查" : phase === "installed" ? "重新检查" : phase === "error" ? "重试" : "检查更新";
+      const label = phase === "checking" ? "检查中…" : phase === "downloading" ? "下载中…" : phase === "ready" ? "自动更新" : phase === "current" ? "重新检查" : phase === "installed" ? "重新检查" : phase === "error" ? "重试" : "检查更新";
       const busy = phase === "checking" || phase === "downloading";
       const progressText = progress?.total && progress.percent !== null ? " " + Math.round(progress.percent * 100) + "%" : "";
       const statusClass = kind === "err" ? "dshDeskUpd_error" : kind === "ok" ? "dshDeskUpd_ok" : "dshDeskUpd_meta";
@@ -99,7 +100,7 @@
       const updater = window.__DSH_DESKTOP_UPDATER__;
       return jsxs("div", { className: "dshDeskUpd_section", children: [
         jsx("h2", { className: "dshDeskUpd_title", children: "更新" }),
-        jsx("p", { className: "dshDeskUpd_intro", children: "分别检查 CLI 与桌面应用。桌面安装包需要手动安装，不会自动替换正在运行的应用。" }),
+        jsx("p", { className: "dshDeskUpd_intro", children: "分别检查 CLI 与桌面应用。桌面应用会自动下载、替换并重启；从 DMG 直接运行时需要先复制到 Applications。" }),
         jsx(UpdateCard, { updater, desktop: false, title: "DeepSeek Harness CLI", idleMessage: "从 npm 检查 CLI 最新版本" }),
         jsx(UpdateCard, { updater, desktop: true, title: "DeepSeek Harness Desktop", idleMessage: "从 GitHub Releases 检查当前平台安装包" })
       ] });

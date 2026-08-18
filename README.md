@@ -2,7 +2,7 @@
 
 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 变成一个更方便使用的桌面应用。
 
-当前版本：`v0.1.5`
+当前版本：`v0.1.6`
 
 支持 macOS、Windows 和 Linux。
 
@@ -65,7 +65,7 @@
 - **DeepSeek Harness CLI**：更新官方 Harness
 - **DeepSeek Harness Desktop**：更新桌面应用
 
-桌面应用更新会下载新的安装包，需要用户手动安装，不会直接替换正在运行的软件。
+桌面应用更新会下载新版本，自动退出、替换旧版本并重新打开应用。若应用正从 DMG 挂载盘运行，请先将它拖入 Applications 文件夹；没有写入权限时会提示你手动安装。
 
 ## 从源码运行
 

@@ -4,8 +4,8 @@
 import { app, BrowserWindow, Menu, dialog, shell, ipcMain } from "electron";
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
-import { appendFileSync, createWriteStream, existsSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { accessSync, appendFileSync, constants, createWriteStream, existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -15,6 +15,7 @@ import { compareVersions, parseVersion, pickDesktopAsset } from "./update-utils.
 import { detectNodeVersion, ensureNodeRuntime, isSupportedNodeVersion, runtimePathEnv } from "./runtime.js";
 import { ensureDefaultImageInputSettings, watchDefaultImageInputSettings } from "./image-input-defaults.js";
 import { DSH_PLUGIN_TOPIC_API, normalizeForumPlugins } from "./forum-plugin-utils.js";
+import { downloadFilename, installedTarget, updateCommand } from "./desktop-update-helper.js";
 
 const SMOKE_TEST = process.argv.includes("--smoke-test");
 const SMOKE_TIMEOUT_MS = 120000;
@@ -276,6 +277,14 @@ async function fetchGitHubJson(url) {
   try { return JSON.parse(text); } catch { throw new Error("GitHub 返回了无效的 JSON"); }
 }
 
+function canWriteInstalledApp() {
+  try {
+    const target = installedTarget({ platform: process.platform, execPath: process.execPath });
+    accessSync(dirname(target), constants.W_OK);
+    return true;
+  } catch { return false; }
+}
+
 async function checkDesktopUpdate() {
   const currentVersion = parseVersion(app.getVersion()) || app.getVersion();
   const releasesUrl = "https://github.com/" + DESKTOP_REPOSITORY + "/releases";
@@ -296,11 +305,13 @@ async function checkDesktopUpdate() {
   const latestVersion = parseVersion(release.tag_name || release.name);
   if (!latestVersion) throw new Error("GitHub Release 没有有效的版本号");
   const asset = pickDesktopAsset(release.assets, { platform: process.platform, arch: process.arch });
+  const canAutoUpdate = !process.execPath.includes("/Volumes/") && canWriteInstalledApp() && (process.platform === "darwin" || process.platform === "win32" || process.platform === "linux");
   const result = {
     currentVersion,
     latestVersion,
     hasUpdate: compareVersions(latestVersion, currentVersion) > 0,
     available: Boolean(asset),
+    canAutoUpdate,
     assetName: asset?.name || null,
     releaseUrl: release.html_url || releasesUrl,
     runningFromMountedImage: process.execPath.includes("/Volumes/"),
@@ -318,6 +329,7 @@ async function installDesktopUpdate() {
     if (!update.hasUpdate) throw new Error(update.latestVersion ? "当前桌面应用已经是最新版本" : "没有可用的桌面应用更新");
     if (!update.available) throw new Error(update.message || "没有适用于当前平台的安装包");
     if (update.runningFromMountedImage) throw new Error("当前应用正在从 DMG 挂载盘运行，请先将它拖入 Applications 文件夹");
+    if (!update.canAutoUpdate) throw new Error("当前安装位置不支持自动更新，请打开发布页手动安装");
     const release = desktopReleaseCache?.release;
     const asset = pickDesktopAsset(release?.assets, { platform: process.platform, arch: process.arch });
     if (!asset?.browser_download_url) throw new Error("桌面应用安装包下载地址不可用");
@@ -327,7 +339,7 @@ async function installDesktopUpdate() {
     if (!response.ok || !response.body) throw new Error("下载安装包失败 (" + response.status + ")");
     const updateDir = join(app.getPath("temp"), "deepseek-harness-desktop-updates");
     await mkdir(updateDir, { recursive: true });
-    const filename = update.latestVersion + "-" + String(asset.name).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const filename = downloadFilename(update.latestVersion, asset.name);
     const assetPath = join(updateDir, filename);
     const total = Number(asset.size || response.headers.get("content-length") || 0);
     let received = 0;
@@ -338,15 +350,20 @@ async function installDesktopUpdate() {
     });
     await pipeline(nodeStream, createWriteStream(assetPath));
     if (asset.size && received !== asset.size) throw new Error("下载安装包不完整");
-    const openError = await shell.openPath(assetPath);
-    if (openError) throw new Error("安装包已下载，但无法打开：" + openError);
+    const targetPath = installedTarget({ platform: process.platform, execPath: process.execPath });
+    const restartPath = process.platform === "darwin" ? join(targetPath, "Contents", "MacOS", basename(targetPath, ".app")) : process.execPath;
+    const helper = updateCommand({ platform: process.platform, sourcePath: assetPath, targetPath, restartPath });
+    const helperChild = spawn(helper.command, helper.args, { detached: true, stdio: "ignore", windowsHide: true });
+    helperChild.unref();
+    setTimeout(() => shutdown(0), 250);
     return {
       version: update.latestVersion,
       assetName: asset.name,
       assetPath,
       releaseUrl: update.releaseUrl,
-      requiresManualInstall: true,
-      message: process.platform === "darwin" ? "安装包已打开，请将应用拖入 Applications 文件夹后完全退出并重新启动；未签名应用可能需要右键打开" : "安装包已打开，请完成安装后完全退出并重新启动应用"
+      requiresManualInstall: false,
+      restarting: true,
+      message: "下载完成，应用将自动退出、替换并重新启动。"
     };
   } finally {
     desktopUpdateInFlight = false;
