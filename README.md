@@ -35,6 +35,14 @@
   - PDF、Word、Excel 等文件暂时不支持
 - 支持 macOS、Windows 和 Linux
 
+## 内置插件：用量统计（dsh-usage-stats）
+
+应用自带 [dsh-usage-stats](plugins/dsh-usage-stats) 插件（多供应商余额、订阅额度与 Token 用量分析）。每次启动应用时，它会自动把插件安装/同步到当前 dsh 环境（`DSH_HOME` 或 `~/.dsh`）的 `profiles/web`，并幂等启用：
+
+- 设置 → 插件 → “用量统计”标签页可查看安装状态，手动点击“安装 / 更新”可重新同步。
+- 安装后重启 dsh web 并在浏览器硬刷新，侧边栏底部会出现“用量/余额”（Usage/Balance）入口。
+- 插件源码位于 [plugins/dsh-usage-stats](plugins/dsh-usage-stats)，安装逻辑见 [usage-stats-plugin.js](usage-stats-plugin.js)。
+
 ## 安装使用
 
 ### 普通用户
@@ -111,6 +119,12 @@ npm run dist:win
 ```text
 dsh-desktop.log
 ```
+
+### 关闭桌面应用时，dsh web 会一起关闭吗？
+
+会。桌面应用启动的 dsh web 是它的子进程，关闭应用时会先给它发 SIGTERM 等待优雅退出（最长约 5 秒），超时再强制结束，不会留下后台孤儿进程。
+
+只有一种情况例外：如果 dsh web 是在打开桌面应用之前就已经由其他方式（例如终端）启动的，桌面应用只是复用它，关闭时不会动它。
 
 ### 如何发送文件？
 
