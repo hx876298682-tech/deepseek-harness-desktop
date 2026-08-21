@@ -26,7 +26,14 @@ export function defaultDshHome() {
 
 /** Absolute path to the vendored plugin package inside this app. */
 export function bundledPluginRoot() {
-  return join(dirname(fileURLToPath(import.meta.url)), "plugins", PLUGIN_NAME);
+  return bundledPluginRootForModulePath(fileURLToPath(import.meta.url));
+}
+
+/** Resolve the vendored plugin from disk when this module is inside app.asar. */
+export function bundledPluginRootForModulePath(modulePath) {
+  const moduleRoot = dirname(modulePath);
+  const diskRoot = /[\\/]app\.asar$/.test(moduleRoot) ? `${moduleRoot}.unpacked` : moduleRoot;
+  return join(diskRoot, "plugins", PLUGIN_NAME);
 }
 
 /** Version of the plugin bundled with this app, or null when unreadable. */

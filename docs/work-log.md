@@ -41,3 +41,25 @@
 
 1. 将桌面应用启动时使用的 dsh CLI 更新到 `0.1.0-rc.7` 或更高版本，并避免优先选取过期 npx 缓存。
 2. 更新后重启应用；若仍不显示，再对 `settings.describe`/`llm.providers` 的实际返回做一次界面层核对。
+
+### 2026-08-21 工作区与用量插件核查
+
+- 当前分支 `codex/model-capabilities` 工作区干净：没有已暂存或未暂存的改动。
+- 仓库内置完整的 `dsh-usage-stats` 用量插件，源码在 `plugins/dsh-usage-stats`；服务端接口在 `lib/index.js`，前端面板在 `lib/client.js`，Token 聚合在 `lib/usage.js`。
+- 桌面壳通过根目录 `usage-stats-plugin.js` 在启动时同步插件至 `~/.dsh/profiles/node_modules/dsh-usage-stats` 并幂等写入 Cordis 配置；`main.js` 还提供状态查询和手动安装 IPC。构建配置已包含插件目录与安装逻辑。
+- 相关功能由提交 `224ed0a feat: bundle dsh-usage-stats plugin and auto-install at launch` 引入。
+
+### 2026-08-21 更新后启动报错核查
+
+- 当前已安装 App 为 `0.1.9`；启动日志明确报错：`usage-stats plugin setup failed: ENOTDIR`，路径为 `app.asar/plugins/dsh-usage-stats/lib`。
+- 根因是 electron-builder 将插件放进 `app.asar` 后，桌面端安装器使用 `fs.cp` 递归读取 asar 虚拟目录；Electron 的 asar 路径不能按普通目录遍历，因此插件同步失败。dsh 主进程随后仍能启动。
+- 已先写入一个回归测试，要求打包模块把插件根目录解析到 `app.asar.unpacked`；尚未写生产修复。
+- 实施过程中发现 `package.json` 在 2026-08-21 18:44 被外部改成仅 8 行，原有 scripts、devDependencies 与 electron-builder 配置全部消失；该改动不是本轮产生，已暂停构建修复和版本发布，等待确认是否需要恢复。
+
+### 2026-08-21 启动报错修复与 v0.1.10
+
+- 按用户要求恢复 `package.json` 原有 scripts、devDependencies 和 electron-builder 配置，并同步恢复完整构建元数据。
+- `usage-stats-plugin.js` 新增打包路径解析：模块位于 `app.asar` 时改用同级 `app.asar.unpacked/plugins/dsh-usage-stats`；`package.json` 增加 `asarUnpack`，避免 `fs.cp` 遍历 asar 虚拟目录触发 `ENOTDIR`。
+- 新增打包路径回归测试；项目测试共 33 项全部通过。
+- 版本与 lockfile 更新到 `0.1.10`；已成功构建 `dist/DeepSeekHarnessDesktop-0.1.10-arm64.dmg`，并确认插件文件实际位于 `dist/mac-arm64/.../app.asar.unpacked/plugins/dsh-usage-stats/lib/index.js`。
+- 裸应用 smoke 在当前无可用 GUI 会话环境中无法完成，手动中断；DMG 未使用正式 Developer ID 签名。

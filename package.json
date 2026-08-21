@@ -1,7 +1,7 @@
 {
   "name": "deepseek-harness-desktop",
   "productName": "DeepSeek Harness Desktop",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Native Electron desktop shell for the DeepSeek Harness Web UI.",
   "main": "main.js",
   "type": "module",
@@ -23,6 +23,7 @@
     "appId": "ai.deepseek.harness.desktop",
     "productName": "DeepSeek Harness Desktop",
     "asar": true,
+    "asarUnpack": ["plugins/dsh-usage-stats/**"],
     "files": ["main.js", "preload.cjs", "resolve-dsh.js", "runtime.js", "image-input-defaults.js", "model-capabilities.js", "text-file-utils.js", "forum-plugin-utils.js", "desktop-update-helper.js", "github-release-fallback.js", "update-utils.js", "update-section.js", "usage-stats-plugin.js", "plugins", "README.md", "LICENSE"],
     "mac": {
       "icon": "build/icon.icns",

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { enablePluginInPatch, installUsageStatsPlugin, usageStatsPluginStatus, PLUGIN_NAME } from "./usage-stats-plugin.js";
+import { bundledPluginRootForModulePath, enablePluginInPatch, installUsageStatsPlugin, usageStatsPluginStatus, PLUGIN_NAME } from "./usage-stats-plugin.js";
 
 const FAKE_PACKAGE = {
   name: PLUGIN_NAME,
@@ -100,4 +100,12 @@ test("status reports not installed when package is missing", async () => {
   } finally {
     await rm(home, { recursive: true, force: true });
   }
+});
+
+test("bundled plugin root uses the unpacked tree for packaged asar modules", () => {
+  const modulePath = "/Applications/DeepSeek Harness Desktop.app/Contents/Resources/app.asar/usage-stats-plugin.js";
+  assert.equal(
+    bundledPluginRootForModulePath(modulePath),
+    "/Applications/DeepSeek Harness Desktop.app/Contents/Resources/app.asar.unpacked/plugins/dsh-usage-stats"
+  );
 });
