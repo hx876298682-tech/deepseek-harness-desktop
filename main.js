@@ -14,10 +14,12 @@ import { candidateBinDirs, findInDirs, findNode, resolveDsh } from "./resolve-ds
 import { compareVersions, parseVersion, pickDesktopAsset } from "./update-utils.js";
 import { detectNodeVersion, ensureNodeRuntime, isSupportedNodeVersion, runtimePathEnv } from "./runtime.js";
 import { ensureDefaultImageInputSettings, watchDefaultImageInputSettings } from "./image-input-defaults.js";
+import { ensureModelCapabilitySettings } from "./model-capabilities.js";
 import { DSH_PLUGIN_TOPIC_API, normalizeForumPlugins } from "./forum-plugin-utils.js";
 import { bundledPluginVersion, installUsageStatsPlugin, usageStatsPluginStatus } from "./usage-stats-plugin.js";
 import { downloadFilename, installedTarget, updateCommand } from "./desktop-update-helper.js";
 import { fallbackAsset, isGitHubRateLimit, latestTagFromLocation } from "./github-release-fallback.js";
+import { DSH_INSTALL_TIMEOUT_MS, dshInstallArgs, formatDshInstallTimeout } from "./dsh-update-utils.js";
 
 const SMOKE_TEST = process.argv.includes("--smoke-test");
 const SMOKE_TIMEOUT_MS = 120000;
@@ -107,6 +109,11 @@ async function run() {
   }
 
   try {
+    try {
+      ensureModelCapabilitySettings({ log });
+    } catch (error) {
+      log("model capability migration failed: " + error.message);
+    }
     ensureDefaultImageInputSettings({ log });
     stopImageSettingsWatch = watchDefaultImageInputSettings({ log });
     const managedRoot = join(app.getPath("userData"), "dsh");
@@ -318,7 +325,16 @@ function runCommand(command, args, timeoutMs = 120000) {
     });
     let stdout = "";
     let stderr = "";
-    const timer = setTimeout(() => { commandChild.kill("SIGTERM"); reject(new Error(command + " timed out after " + timeoutMs + "ms")); }, timeoutMs);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      commandChild.kill("SIGTERM");
+      const error = new Error(command + " timed out after " + timeoutMs + "ms");
+      error.code = "COMMAND_TIMEOUT";
+      error.stdout = stdout;
+      error.stderr = stderr;
+      reject(error);
+    }, timeoutMs);
     commandChild.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
     commandChild.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
     commandChild.once("error", (error) => { clearTimeout(timer); reject(error); });
@@ -470,7 +486,13 @@ async function installDesktopUpdate() {
 
 async function installDshUpdate() {
   const installRoot = join(app.getPath("userData"), "dsh");
-  const result = await runCommand(findNpm(), ["install", "--prefix", installRoot, "--no-fund", "--no-audit", UPDATE_PACKAGE + "@latest"], 300000);
+  let result;
+  try {
+    result = await runCommand(findNpm(), dshInstallArgs({ installRoot, packageName: UPDATE_PACKAGE }), DSH_INSTALL_TIMEOUT_MS);
+  } catch (error) {
+    if (error?.code === "COMMAND_TIMEOUT") throw new Error(formatDshInstallTimeout());
+    throw error;
+  }
   const managedBin = join(installRoot, "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js");
   if (!existsSync(managedBin)) throw new Error("安装完成后找不到新的 dsh CLI");
   process.env.DSH_BIN = managedBin;

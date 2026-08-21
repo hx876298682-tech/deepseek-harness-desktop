@@ -2,7 +2,7 @@
 
 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 变成一个更方便使用的桌面应用。
 
-当前版本：`v0.1.8`
+当前版本：`v0.1.9`
 
 支持 macOS、Windows 和 Linux。
 
@@ -22,6 +22,7 @@
 - 第一次打开时，自动准备 Node.js 和 DeepSeek Harness
 - 不需要用户提前安装 DeepSeek Harness
 - 支持在设置里更新 Harness 和桌面应用
+- 更新桌面应用后，会按 dsh/pi-ai 官方模型目录为已知自定义模型配置对应的思考强度；无法确认能力的模型默认不显示思考强度
 - 在设置 → 插件中增加“论坛插件”，可以浏览 GitHub 上的 DSH 插件
 - 支持复制、粘贴和常用快捷键
 - 支持发送图片
@@ -74,6 +75,8 @@
 - **DeepSeek Harness Desktop**：更新桌面应用
 
 桌面应用更新会下载新版本，自动退出、替换旧版本并重新打开应用。若应用正从 DMG 挂载盘运行，请先将它拖入 Applications 文件夹；没有写入权限时会提示你手动安装。
+
+桌面应用启动时会对 `~/.dsh/settings.yaml` 做一次模型能力迁移。迁移只修改已识别的 `gongsi` / `gongsi-claude` 模型字段，保留其他配置；写入前会生成 `settings.yaml.bak-model-capabilities-*` 备份。思考档位来自当前 dsh/pi-ai 模型目录，未声明的档位不会显示，无法确认官方能力的模型会使用 `reasoningEfforts: false`。
 
 ## 从源码运行
 
