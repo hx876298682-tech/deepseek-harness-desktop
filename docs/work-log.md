@@ -73,3 +73,4 @@
 - 版本更新到 `0.1.11`，构建包确认包含 `dsh-update-utils.js`；打包裸应用 smoke 输出 `SMOKE_OK`，用量插件同步成功。
 - 已将 `0.1.11` arm64 App 安装到 `/Applications/DeepSeek Harness Desktop.app`，保留旧包备份；通过 Computer Use 读取到真实窗口，页面可见“用量/余额”入口，确认本地 App 已恢复可用。
 - 期间发现 `package.json` 曾被外部再次覆盖为仅 8 行，已恢复并纳入本次提交；本轮未修改 `~/.dsh/settings.yaml`。
+- 已推送提交 `f7d1455 fix: include desktop runtime dependency in app bundle`、标签 `v0.1.11`；GitHub Release：`https://github.com/hx876298682-tech/deepseek-harness-desktop/releases/tag/v0.1.11`。arm64 DMG SHA-256：`07e5f87cf2832a162e1b3998ba7023359e973687f4b19960640906d8bfe2bb0b`。
