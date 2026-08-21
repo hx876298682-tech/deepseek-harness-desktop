@@ -33,6 +33,9 @@
 - 使用真实 `@deepseek-ai/dsh-llm-pi-ai` runtime 校验迁移后的当前配置，`gongsi-claude`、`gongsi` 两个 provider 均 serviceable。
 - 版本从 `0.1.8` 更新到 `0.1.9`，electron-builder 白名单包含新模块；源码 smoke test 通过，asar 内容确认包含 `model-capabilities.js`。
 - 已构建 `dist/DeepSeekHarnessDesktop-0.1.9-arm64.dmg`（104 MB）；由于当前无 GUI 会话，直接运行打包裸二进制的 smoke 未完成，未将其记为通过。
+- 发布代码提交：`97cb86f feat: migrate model-specific reasoning capabilities`，分支：`codex/model-capabilities`；随该版本一并包含此前已暂存的 dsh 更新超时处理改动。
+- 已推送标签 `v0.1.9` 并发布 GitHub Release：`https://github.com/hx876298682-tech/deepseek-harness-desktop/releases/tag/v0.1.9`，资产为 arm64 DMG（SHA-256：`93e2a2e1be1f4980fe830df0f1231b97f6e290b3578dbc3b63526ae5d1c89c7e`）及 blockmap。
+- 用更新器同一套版本比较/资产匹配逻辑验证：已安装 `0.1.8` 会发现 `0.1.9` 并选择 `DeepSeekHarnessDesktop-0.1.9-arm64.dmg`。
 
 ### 待处理建议
 

@@ -47,5 +47,5 @@
 - [x] Run `npm test` or the repository's complete test command and the focused migration tests.
 - [x] Run a runtime serviceability probe against a migrated fixture and run the Electron smoke test.
 - [x] Build the macOS arm64 DMG and verify the artifact name/version.
-- [ ] Commit only the task changes while preserving unrelated user edits, create tag `v0.1.9`, push the branch/tag to `origin`, and create the GitHub release with the DMG asset.
-- [ ] Record the commit, tag, release URL, artifact, and verification results in `docs/work-log.md`.
+- [x] Commit only the task changes while preserving unrelated user edits, create tag `v0.1.9`, push the branch/tag to `origin`, and create the GitHub release with the DMG asset.
+- [x] Record the commit, tag, release URL, artifact, and verification results in `docs/work-log.md`.
