@@ -64,3 +64,12 @@
 - 版本与 lockfile 更新到 `0.1.10`；已成功构建 `dist/DeepSeekHarnessDesktop-0.1.10-arm64.dmg`，并确认插件文件实际位于 `dist/mac-arm64/.../app.asar.unpacked/plugins/dsh-usage-stats/lib/index.js`。
 - 裸应用 smoke 在当前无可用 GUI 会话环境中无法完成，手动中断；DMG 未使用正式 Developer ID 签名。
 - 已推送提交 `8eda68e fix: unpack bundled usage plugin for desktop runtime`、分支 `codex/model-capabilities` 和标签 `v0.1.10`；GitHub Release：`https://github.com/hx876298682-tech/deepseek-harness-desktop/releases/tag/v0.1.10`。DMG SHA-256：`6ebf266cfea6c6bd12d7222257e4980756f570c1485be49ef7200df54b82cb2e`。
+
+### 2026-08-22 本地 App 启动修复与 v0.1.11
+
+- 本地 `/Applications/DeepSeek Harness Desktop.app` 更新后无法打开；对比旧版确认 Electron 在打包 `app.asar` 载入阶段失败，源码运行 smoke 正常。
+- 解包当前 `app.asar` 得到明确错误：`ERR_MODULE_NOT_FOUND: Cannot find module .../dsh-update-utils.js imported from .../main.js`。根因是 electron-builder `build.files` 漏列 `dsh-update-utils.js`，导致安装包缺少主进程静态依赖并弹出原生错误框。
+- 新增 `package-build.test.js` 锁定桌面运行时模块必须进入打包白名单；项目测试共 34 项通过。
+- 版本更新到 `0.1.11`，构建包确认包含 `dsh-update-utils.js`；打包裸应用 smoke 输出 `SMOKE_OK`，用量插件同步成功。
+- 已将 `0.1.11` arm64 App 安装到 `/Applications/DeepSeek Harness Desktop.app`，保留旧包备份；通过 Computer Use 读取到真实窗口，页面可见“用量/余额”入口，确认本地 App 已恢复可用。
+- 期间发现 `package.json` 曾被外部再次覆盖为仅 8 行，已恢复并纳入本次提交；本轮未修改 `~/.dsh/settings.yaml`。
