@@ -63,3 +63,4 @@
 - 新增打包路径回归测试；项目测试共 33 项全部通过。
 - 版本与 lockfile 更新到 `0.1.10`；已成功构建 `dist/DeepSeekHarnessDesktop-0.1.10-arm64.dmg`，并确认插件文件实际位于 `dist/mac-arm64/.../app.asar.unpacked/plugins/dsh-usage-stats/lib/index.js`。
 - 裸应用 smoke 在当前无可用 GUI 会话环境中无法完成，手动中断；DMG 未使用正式 Developer ID 签名。
+- 已推送提交 `8eda68e fix: unpack bundled usage plugin for desktop runtime`、分支 `codex/model-capabilities` 和标签 `v0.1.10`；GitHub Release：`https://github.com/hx876298682-tech/deepseek-harness-desktop/releases/tag/v0.1.10`。DMG SHA-256：`6ebf266cfea6c6bd12d7222257e4980756f570c1485be49ef7200df54b82cb2e`。
